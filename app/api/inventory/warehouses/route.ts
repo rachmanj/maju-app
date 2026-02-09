@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth/config';
 import { WarehouseService } from '@/lib/services/warehouse-service';
 import { hasPermission, PERMISSIONS } from '@/lib/auth/permissions';
+import type { Warehouse } from '@/types/database';
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,9 +15,9 @@ export async function GET(request: NextRequest) {
     const all = searchParams.get('all') === 'true';
     if (all) {
       const warehouses = await WarehouseService.listAll();
-      const serialized = warehouses.map((w: Record<string, unknown>) => {
+      const serialized = warehouses.map((w: Warehouse) => {
         const out: Record<string, unknown> = {};
-        for (const [k, v] of Object.entries(w)) {
+        for (const [k, v] of Object.entries(w as unknown as Record<string, unknown>)) {
           out[k] = typeof v === 'bigint' ? Number(v) : v;
         }
         return out;
