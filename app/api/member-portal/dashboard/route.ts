@@ -28,13 +28,13 @@ export async function GET() {
       }),
     ]);
 
-    const totalSavings = accounts.reduce((sum, a) => sum + Number(a.balance), 0);
+    const totalSavings = accounts.reduce((sum: number, a) => sum + Number(a.balance), 0);
     const { loans } = await LoanService.listLoans({ member_id: memberId, limit: 100 });
     const outstandingLoans = loans.filter(
       (l) => ['approved', 'disbursed', 'active'].includes((l as { status?: string }).status ?? '')
     );
     const totalOutstanding = outstandingLoans.reduce(
-      (sum, l) => sum + (Number((l as any).principal_amount) ?? 0),
+      (sum: number, l) => sum + (Number((l as any).principal_amount) ?? 0),
       0
     );
 
