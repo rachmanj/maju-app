@@ -26,8 +26,7 @@ export default function LoginPage() {
         message.error("Email atau password salah");
       } else {
         message.success("Login berhasil");
-        router.push("/dashboard");
-        router.refresh();
+        window.location.href = "/dashboard";
       }
     } catch (error) {
       message.error("Terjadi kesalahan saat login");
