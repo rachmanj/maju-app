@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth/config';
 import { SavingsService } from '@/lib/services/savings-service';
 import { LoanService } from '@/lib/services/loan-service';
 import { prisma } from '@/lib/db/prisma';
-import type { SavingsAccount } from '@/types/database';
+import type { Loan, SavingsAccount } from '@/types/database';
 
 export async function GET() {
   try {
@@ -31,11 +31,11 @@ export async function GET() {
 
     const totalSavings = accounts.reduce((sum: number, a: SavingsAccount) => sum + Number(a.balance), 0);
     const { loans } = await LoanService.listLoans({ member_id: memberId, limit: 100 });
-    const outstandingLoans = loans.filter(
-      (l) => ['approved', 'disbursed', 'active'].includes((l as { status?: string }).status ?? '')
+    const outstandingLoans = loans.filter((l: Loan) =>
+      ['approved', 'disbursed', 'active'].includes(l.status ?? '')
     );
     const totalOutstanding = outstandingLoans.reduce(
-      (sum: number, l) => sum + (Number((l as any).principal_amount) ?? 0),
+      (sum: number, l: Loan) => sum + (Number(l.principal_amount) ?? 0),
       0
     );
 
@@ -49,20 +49,18 @@ export async function GET() {
 
     return NextResponse.json({
       totalSavings,
-      savingsByType: accounts.map((a) => ({
-        code: (a as any).savings_type_code,
-        name: (a as any).savings_type_name,
+      savingsByType: accounts.map((a: SavingsAccount & { savings_type_code?: string; savings_type_name?: string }) => ({
+        code: a.savings_type_code,
+        name: a.savings_type_name,
         balance: Number(a.balance),
       })),
       totalOutstanding,
       activeLoansCount: outstandingLoans.length,
       recentTransactions: recent,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Member portal dashboard:', error);
-    return NextResponse.json(
-      { error: error.message || 'Failed to load dashboard' },
-      { status: 500 }
-    );
+    const message = error instanceof Error ? error.message : 'Failed to load dashboard';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
