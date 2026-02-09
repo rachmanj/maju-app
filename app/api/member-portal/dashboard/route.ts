@@ -39,7 +39,7 @@ export async function GET() {
       0
     );
 
-    const recent = recentTransactions.map((t) => ({
+    const recent = recentTransactions.map((t: (typeof recentTransactions)[number]) => ({
       id: Number(t.id),
       type: t.transaction_type,
       amount: Number(t.amount),
