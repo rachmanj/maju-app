@@ -16,10 +16,11 @@ export async function GET() {
       orderBy: { code: 'asc' },
     });
     return NextResponse.json(
-      rows.map((r) => ({ id: Number(r.id), code: r.code, name: r.name }))
+      rows.map((r: (typeof rows)[number]) => ({ id: Number(r.id), code: r.code, name: r.name }))
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Member portal warehouses:', error);
-    return NextResponse.json({ error: error.message || 'Failed' }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Failed';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

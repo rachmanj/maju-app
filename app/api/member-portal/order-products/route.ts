@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
     });
 
     const result = await Promise.all(
-      stockRows.map(async (r) => {
+      stockRows.map(async (r: (typeof stockRows)[number]) => {
         const productId = Number(r.product_id);
         const qty = Number(r.quantity);
         if (qty <= 0) return null;
@@ -67,8 +67,9 @@ export async function GET(request: NextRequest) {
 
     const items = result.filter(Boolean);
     return NextResponse.json(items);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Member portal order-products:', error);
-    return NextResponse.json({ error: error.message || 'Failed' }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Failed';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

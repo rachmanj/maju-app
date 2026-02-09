@@ -25,11 +25,9 @@ export async function GET(
 
     const schedules = await LoanService.getLoanSchedules(loanId);
     return NextResponse.json(schedules);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Member portal loan schedules:', error);
-    return NextResponse.json(
-      { error: error.message || 'Failed to load schedules' },
-      { status: 500 }
-    );
+    const message = error instanceof Error ? error.message : 'Failed to load schedules';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

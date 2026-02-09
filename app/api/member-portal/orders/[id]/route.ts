@@ -25,11 +25,9 @@ export async function GET(
 
     const detail = await OrderService.getOrder(orderId);
     return NextResponse.json(detail);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Member portal order detail:', error);
-    return NextResponse.json(
-      { error: error.message || 'Failed to load order' },
-      { status: 500 }
-    );
+    const message = error instanceof Error ? error.message : 'Failed to load order';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

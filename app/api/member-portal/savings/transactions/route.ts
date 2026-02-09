@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth/config';
 import { SavingsService } from '@/lib/services/savings-service';
 import { prisma } from '@/lib/db/prisma';
+import type { SavingsAccount, SavingsTransaction } from '@/types/database';
 
 export async function GET(request: NextRequest) {
   try {
@@ -22,13 +23,13 @@ export async function GET(request: NextRequest) {
         const { transactions } = await SavingsService.getTransactionHistory(acc.id, 1, 50);
         for (const t of transactions) {
           allTx.push({
-            id: (t as any).id,
+            id: t.id,
             account_id: acc.id,
-            type: (t as any).transaction_type,
-            amount: Number((t as any).amount),
-            date: (t as any).transaction_date,
-            balance_after: Number((t as any).balance_after),
-            savings_type_name: (acc as any).savings_type_name,
+            type: t.transaction_type,
+            amount: Number(t.amount),
+            date: t.transaction_date,
+            balance_after: Number(t.balance_after),
+            savings_type_name: (acc as SavingsAccount & { savings_type_name?: string }).savings_type_name,
           });
         }
       }
@@ -48,22 +49,20 @@ export async function GET(request: NextRequest) {
 
     const { transactions, total } = await SavingsService.getTransactionHistory(accId, page, limit);
     return NextResponse.json({
-      transactions: transactions.map((t) => ({
-        id: (t as any).id,
-        type: (t as any).transaction_type,
-        amount: Number((t as any).amount),
-        date: (t as any).transaction_date,
-        balance_before: Number((t as any).balance_before),
-        balance_after: Number((t as any).balance_after),
-        notes: (t as any).notes,
+      transactions: transactions.map((t: SavingsTransaction) => ({
+        id: t.id,
+        type: t.transaction_type,
+        amount: Number(t.amount),
+        date: t.transaction_date,
+        balance_before: Number(t.balance_before),
+        balance_after: Number(t.balance_after),
+        notes: t.notes,
       })),
       total,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Member portal savings transactions:', error);
-    return NextResponse.json(
-      { error: error.message || 'Failed to load transactions' },
-      { status: 500 }
-    );
+    const message = error instanceof Error ? error.message : 'Failed to load transactions';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
