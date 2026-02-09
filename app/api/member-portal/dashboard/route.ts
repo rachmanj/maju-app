@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth/config';
 import { SavingsService } from '@/lib/services/savings-service';
 import { LoanService } from '@/lib/services/loan-service';
 import { prisma } from '@/lib/db/prisma';
+import type { SavingsAccount } from '@/types/database';
 
 export async function GET() {
   try {
@@ -28,7 +29,7 @@ export async function GET() {
       }),
     ]);
 
-    const totalSavings = accounts.reduce((sum: number, a) => sum + Number(a.balance), 0);
+    const totalSavings = accounts.reduce((sum: number, a: SavingsAccount) => sum + Number(a.balance), 0);
     const { loans } = await LoanService.listLoans({ member_id: memberId, limit: 100 });
     const outstandingLoans = loans.filter(
       (l) => ['approved', 'disbursed', 'active'].includes((l as { status?: string }).status ?? '')
