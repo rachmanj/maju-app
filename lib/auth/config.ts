@@ -33,7 +33,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           data: { last_login_at: new Date() },
         });
 
-        const roles = u.user_roles.map((ur) => ur.role.code);
+        const roles = u.user_roles.map((ur: (typeof u.user_roles)[number]) => ur.role.code);
         let memberId: number | null = null;
         if (roles.includes('anggota') && u.email) {
           const member = await prisma.members.findFirst({
