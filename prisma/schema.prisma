@@ -1,0 +1,1024 @@
+// Prisma schema – Koperasi Maju ERP (MySQL)
+// Matches lib/db/schema.sql table names via @@map
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+// ========== AUTH & ROLES ==========
+model users {
+  id           BigInt   @id @default(autoincrement())
+  email        String    @unique @db.VarChar(255)
+  password_hash String   @db.VarChar(255)
+  name         String    @db.VarChar(255)
+  phone        String?   @db.VarChar(20)
+  is_active    Boolean?  @default(true)
+  last_login_at DateTime? @db.Timestamp(0)
+  created_at   DateTime? @default(now()) @db.Timestamp(0)
+  updated_at   DateTime? @default(now()) @updatedAt @db.Timestamp(0)
+  deleted_at   DateTime? @db.Timestamp(0)
+  created_by   BigInt?
+  updated_by   BigInt?
+  user_roles   user_roles[]
+  user_preferences user_preferences?
+  pos_sessions pos_sessions[]
+  @@index([email])
+  @@index([deleted_at])
+  @@map("users")
+}
+
+model roles {
+  id          Int       @id @default(autoincrement())
+  code        String    @unique @db.VarChar(50)
+  name        String    @db.VarChar(100)
+  description String?   @db.Text
+  is_active   Boolean?  @default(true)
+  created_at  DateTime? @default(now()) @db.Timestamp(0)
+  updated_at  DateTime? @default(now()) @updatedAt @db.Timestamp(0)
+  deleted_at  DateTime? @db.Timestamp(0)
+  user_roles user_roles[]
+  role_permissions role_permissions[]
+  @@map("roles")
+}
+
+model permissions {
+  id          Int       @id @default(autoincrement())
+  code        String    @unique @db.VarChar(100)
+  name        String    @db.VarChar(255)
+  module      String    @db.VarChar(100)
+  description String?   @db.Text
+  created_at  DateTime? @default(now()) @db.Timestamp(0)
+  role_permissions role_permissions[]
+  @@map("permissions")
+}
+
+model role_permissions {
+  id            BigInt   @id @default(autoincrement())
+  role_id       Int
+  permission_id Int
+  created_at    DateTime? @default(now()) @db.Timestamp(0)
+  role          roles     @relation(fields: [role_id], references: [id], onDelete: Cascade)
+  permission    permissions @relation(fields: [permission_id], references: [id], onDelete: Cascade)
+  @@unique([role_id, permission_id])
+  @@map("role_permissions")
+}
+
+model user_roles {
+  id        BigInt   @id @default(autoincrement())
+  user_id   BigInt
+  role_id   Int
+  created_at DateTime? @default(now()) @db.Timestamp(0)
+  user      users    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  role      roles    @relation(fields: [role_id], references: [id], onDelete: Cascade)
+  @@unique([user_id, role_id])
+  @@index([user_id])
+  @@index([role_id])
+  @@map("user_roles")
+}
+
+model user_preferences {
+  id               BigInt   @id @default(autoincrement())
+  user_id          BigInt   @unique
+  theme            String?  @default("light") @db.VarChar(10)
+  sidebar_collapsed Boolean? @default(false)
+  language         String?  @default("id") @db.VarChar(10)
+  dashboard_layout Json?
+  created_at       DateTime? @default(now()) @db.Timestamp(0)
+  updated_at       DateTime? @default(now()) @updatedAt @db.Timestamp(0)
+  user             users    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  @@map("user_preferences")
+}
+
+// ========== MEMBERSHIP ==========
+model projects {
+  id         Int      @id @default(autoincrement())
+  code       String   @unique @db.VarChar(50)
+  name       String   @db.VarChar(255)
+  address    String?  @db.Text
+  is_active  Boolean? @default(true)
+  created_at DateTime? @default(now()) @db.Timestamp(0)
+  updated_at DateTime? @default(now()) @updatedAt @db.Timestamp(0)
+  deleted_at DateTime? @db.Timestamp(0)
+  created_by BigInt?
+  updated_by BigInt?
+  members    members[]
+  @@map("projects")
+}
+
+model members {
+  id            BigInt    @id @default(autoincrement())
+  nik           String    @unique @db.VarChar(16)
+  name          String    @db.VarChar(255)
+  email         String?   @db.VarChar(255)
+  phone         String?   @db.VarChar(20)
+  address       String?   @db.Text
+  job_title     String?   @db.VarChar(255)
+  project_id    Int?
+  status        String?   @default("pending") @db.VarChar(50)
+  joined_date   DateTime? @db.Date
+  resigned_date DateTime? @db.Date
+  created_at    DateTime? @default(now()) @db.Timestamp(0)
+  updated_at    DateTime? @default(now()) @updatedAt @db.Timestamp(0)
+  deleted_at    DateTime? @db.Timestamp(0)
+  created_by    BigInt?
+  updated_by    BigInt?
+  project       projects? @relation(fields: [project_id], references: [id])
+  member_documents member_documents[]
+  member_status_history member_status_history[]
+  member_purchase_limits member_purchase_limits?
+  member_barcodes member_barcodes?
+  member_pins   member_pins?
+  savings_accounts savings_accounts[]
+  loan_applications loan_applications[]
+  loans         loans[]
+  member_credit_scores member_credit_scores[]
+  pos_transactions pos_transactions[]
+  member_receivables member_receivables[]
+  member_orders member_orders[]
+  @@index([nik])
+  @@index([email])
+  @@index([status])
+  @@index([deleted_at])
+  @@map("members")
+}
+
+model member_documents {
+  id            BigInt   @id @default(autoincrement())
+  member_id     BigInt
+  document_type String   @db.VarChar(50)
+  file_path     String   @db.VarChar(500)
+  file_name     String   @db.VarChar(255)
+  file_size     BigInt?
+  mime_type     String?  @db.VarChar(100)
+  created_at    DateTime? @default(now()) @db.Timestamp(0)
+  member        members  @relation(fields: [member_id], references: [id], onDelete: Cascade)
+  @@index([member_id])
+  @@map("member_documents")
+}
+
+model member_status_history {
+  id         BigInt   @id @default(autoincrement())
+  member_id BigInt
+  old_status String?  @db.VarChar(50)
+  new_status String   @db.VarChar(50)
+  reason     String?  @db.Text
+  changed_by BigInt?
+  changed_at DateTime? @default(now()) @db.Timestamp(0)
+  member     members  @relation(fields: [member_id], references: [id], onDelete: Cascade)
+  @@index([member_id])
+  @@index([changed_at])
+  @@map("member_status_history")
+}
+
+model member_purchase_limits {
+  id             BigInt   @id @default(autoincrement())
+  member_id      BigInt   @unique
+  limit_amount   Decimal  @db.Decimal(15, 2)
+  effective_date DateTime @db.Date
+  expiry_date    DateTime? @db.Date
+  notes          String?  @db.Text
+  created_at     DateTime? @default(now()) @db.Timestamp(0)
+  updated_at     DateTime? @default(now()) @updatedAt @db.Timestamp(0)
+  created_by     BigInt?
+  updated_by     BigInt?
+  member         members  @relation(fields: [member_id], references: [id], onDelete: Cascade)
+  @@map("member_purchase_limits")
+}
+
+model member_barcodes {
+  id         BigInt   @id @default(autoincrement())
+  member_id  BigInt   @unique
+  barcode    String   @unique @db.VarChar(100)
+  qr_code_path String? @db.VarChar(500)
+  is_active  Boolean? @default(true)
+  created_at DateTime? @default(now()) @db.Timestamp(0)
+  updated_at DateTime? @default(now()) @updatedAt @db.Timestamp(0)
+  member     members  @relation(fields: [member_id], references: [id], onDelete: Cascade)
+  @@index([barcode])
+  @@map("member_barcodes")
+}
+
+model member_pins {
+  id             BigInt    @id @default(autoincrement())
+  member_id      BigInt    @unique
+  pin_hash       String    @db.VarChar(255)
+  is_active      Boolean?  @default(true)
+  failed_attempts Int?     @default(0)
+  locked_until   DateTime? @db.Timestamp(0)
+  created_at     DateTime? @default(now()) @db.Timestamp(0)
+  updated_at     DateTime? @default(now()) @updatedAt @db.Timestamp(0)
+  member         members   @relation(fields: [member_id], references: [id], onDelete: Cascade)
+  @@map("member_pins")
+}
+
+// ========== SAVINGS ==========
+model savings_types {
+  id              Int      @id @default(autoincrement())
+  code            String   @unique @db.VarChar(10)
+  name            String   @db.VarChar(100)
+  is_mandatory    Boolean? @default(false)
+  is_withdrawable Boolean? @default(true)
+  minimum_amount  Decimal? @db.Decimal(15, 2)
+  earns_interest  Boolean? @default(false)
+  created_at      DateTime? @default(now()) @db.Timestamp(0)
+  updated_at      DateTime? @default(now()) @updatedAt @db.Timestamp(0)
+  savings_accounts savings_accounts[]
+  savings_interest_rates savings_interest_rates[]
+  @@map("savings_types")
+}
+
+model savings_accounts {
+  id              BigInt   @id @default(autoincrement())
+  member_id       BigInt
+  savings_type_id Int
+  account_number  String?  @unique @db.VarChar(50)
+  balance         Decimal? @default(0) @db.Decimal(15, 2)
+  opened_date     DateTime @db.Date
+  closed_date     DateTime? @db.Date
+  created_at      DateTime? @default(now()) @db.Timestamp(0)
+  updated_at      DateTime? @default(now()) @updatedAt @db.Timestamp(0)
+  member          members  @relation(fields: [member_id], references: [id], onDelete: Cascade)
+  savings_type    savings_types @relation(fields: [savings_type_id], references: [id])
+  savings_transactions savings_transactions[]
+  savings_interest_calculations savings_interest_calculations[]
+  @@unique([member_id, savings_type_id])
+  @@index([member_id])
+  @@index([account_number])
+  @@map("savings_accounts")
+}
+
+model savings_transactions {
+  id                 BigInt   @id @default(autoincrement())
+  savings_account_id BigInt
+  transaction_type   String   @db.VarChar(50)
+  amount             Decimal  @db.Decimal(15, 2)
+  balance_before     Decimal  @db.Decimal(15, 2)
+  balance_after      Decimal  @db.Decimal(15, 2)
+  transaction_date   DateTime @db.Date
+  reference_number   String?  @db.VarChar(100)
+  notes              String?  @db.Text
+  created_at         DateTime? @default(now()) @db.Timestamp(0)
+  created_by         BigInt?
+  savings_account    savings_accounts @relation(fields: [savings_account_id], references: [id], onDelete: Cascade)
+  @@index([savings_account_id])
+  @@index([transaction_date])
+  @@index([reference_number])
+  @@map("savings_transactions")
+}
+
+model savings_interest_rates {
+  id                Int      @id @default(autoincrement())
+  savings_type_id   Int
+  rate_percentage   Decimal  @db.Decimal(5, 2)
+  effective_date    DateTime @db.Date
+  expiry_date       DateTime? @db.Date
+  calculation_method String? @default("monthly") @db.VarChar(50)
+  is_active         Boolean? @default(true)
+  created_at        DateTime? @default(now()) @db.Timestamp(0)
+  updated_at        DateTime? @default(now()) @updatedAt @db.Timestamp(0)
+  savings_type      savings_types @relation(fields: [savings_type_id], references: [id])
+  @@index([savings_type_id])
+  @@index([effective_date])
+  @@map("savings_interest_rates")
+}
+
+model savings_interest_calculations {
+  id                   BigInt   @id @default(autoincrement())
+  savings_account_id   BigInt
+  calculation_period_start DateTime @db.Date
+  calculation_period_end   DateTime @db.Date
+  average_balance      Decimal  @db.Decimal(15, 2)
+  interest_rate        Decimal  @db.Decimal(5, 2)
+  interest_amount      Decimal  @db.Decimal(15, 2)
+  is_paid              Boolean? @default(false)
+  paid_at              DateTime? @db.Timestamp(0)
+  created_at           DateTime? @default(now()) @db.Timestamp(0)
+  savings_account      savings_accounts @relation(fields: [savings_account_id], references: [id], onDelete: Cascade)
+  @@index([savings_account_id])
+  @@index([calculation_period_start, calculation_period_end])
+  @@map("savings_interest_calculations")
+}
+
+// ========== LOANS ==========
+model loan_applications {
+  id                 BigInt    @id @default(autoincrement())
+  member_id          BigInt
+  application_number String    @unique @db.VarChar(50)
+  requested_amount   Decimal   @db.Decimal(15, 2)
+  requested_term_months Int
+  purpose            String?   @db.Text
+  status             String?   @default("pending") @db.VarChar(50)
+  applied_at         DateTime? @default(now()) @db.Timestamp(0)
+  approved_at        DateTime? @db.Timestamp(0)
+  approved_by        BigInt?
+  rejection_reason   String?   @db.Text
+  member             members   @relation(fields: [member_id], references: [id], onDelete: Cascade)
+  loans              loans[]
+  @@index([member_id])
+  @@index([status])
+  @@index([application_number])
+  @@map("loan_applications")
+}
+
+model loans {
+  id                BigInt   @id @default(autoincrement())
+  member_id         BigInt
+  loan_application_id BigInt?
+  loan_number       String   @unique @db.VarChar(50)
+  principal_amount  Decimal  @db.Decimal(15, 2)
+  interest_rate     Decimal  @db.Decimal(5, 2)
+  interest_method   String?  @default("flat") @db.VarChar(50)
+  term_months       Int
+  status            String?  @default("pending") @db.VarChar(50)
+  approved_date     DateTime? @db.Date
+  disbursed_date    DateTime? @db.Date
+  completed_date    DateTime? @db.Date
+  created_at        DateTime? @default(now()) @db.Timestamp(0)
+  updated_at        DateTime? @default(now()) @updatedAt @db.Timestamp(0)
+  created_by        BigInt?
+  member            members  @relation(fields: [member_id], references: [id], onDelete: Cascade)
+  loan_application  loan_applications? @relation(fields: [loan_application_id], references: [id])
+  loan_schedules    loan_schedules[]
+  loan_payments     loan_payments[]
+  @@index([member_id])
+  @@index([loan_number])
+  @@index([status])
+  @@map("loans")
+}
+
+model loan_schedules {
+  id                  BigInt   @id @default(autoincrement())
+  loan_id             BigInt
+  installment_number  Int
+  due_date            DateTime @db.Date
+  original_due_date   DateTime @db.Date
+  is_due_date_overridden Boolean? @default(false)
+  installment_amount  Decimal  @db.Decimal(15, 2)
+  is_manual_amount    Boolean? @default(false)
+  principal_amount    Decimal  @db.Decimal(15, 2)
+  interest_amount     Decimal  @db.Decimal(15, 2)
+  paid_amount         Decimal? @default(0) @db.Decimal(15, 2)
+  status              String?  @default("pending") @db.VarChar(50)
+  paid_at             DateTime? @db.Timestamp(0)
+  overridden_by       BigInt?
+  overridden_at       DateTime? @db.Timestamp(0)
+  override_reason     String?  @db.Text
+  created_at          DateTime? @default(now()) @db.Timestamp(0)
+  updated_at          DateTime? @default(now()) @updatedAt @db.Timestamp(0)
+  loan                loans    @relation(fields: [loan_id], references: [id], onDelete: Cascade)
+  loan_payments       loan_payments[]
+  @@index([loan_id])
+  @@index([due_date])
+  @@index([status])
+  @@map("loan_schedules")
+}
+
+model loan_payments {
+  id               BigInt   @id @default(autoincrement())
+  loan_id          BigInt
+  loan_schedule_id BigInt?
+  payment_number   String?  @unique @db.VarChar(50)
+  payment_amount   Decimal  @db.Decimal(15, 2)
+  principal_amount Decimal  @db.Decimal(15, 2)
+  interest_amount  Decimal  @db.Decimal(15, 2)
+  payment_date     DateTime @db.Date
+  payment_method   String?  @default("cash") @db.VarChar(50)
+  reference_number String?  @db.VarChar(100)
+  notes            String?  @db.Text
+  created_at       DateTime? @default(now()) @db.Timestamp(0)
+  created_by       BigInt?
+  loan             loans    @relation(fields: [loan_id], references: [id], onDelete: Cascade)
+  loan_schedule    loan_schedules? @relation(fields: [loan_schedule_id], references: [id])
+  @@index([loan_id])
+  @@index([payment_date])
+  @@map("loan_payments")
+}
+
+model member_credit_scores {
+  id         BigInt   @id @default(autoincrement())
+  member_id  BigInt
+  score      Int
+  score_date DateTime @db.Date
+  factors    Json?
+  notes      String?  @db.Text
+  created_at DateTime? @default(now()) @db.Timestamp(0)
+  member     members  @relation(fields: [member_id], references: [id], onDelete: Cascade)
+  @@index([member_id])
+  @@index([score_date])
+  @@map("member_credit_scores")
+}
+
+model loan_interest_rates {
+  id             Int       @id @default(autoincrement())
+  rate_percentage Decimal  @db.Decimal(5, 2)
+  effective_date  DateTime @db.Date
+  expiry_date     DateTime? @db.Date
+  is_active       Boolean? @default(true)
+  created_at      DateTime? @default(now()) @db.Timestamp(0)
+  updated_at      DateTime? @default(now()) @updatedAt @db.Timestamp(0)
+  @@index([effective_date])
+  @@map("loan_interest_rates")
+}
+
+// ========== ACCOUNTING ==========
+model chart_of_accounts {
+  id           Int      @id @default(autoincrement())
+  code         String   @unique @db.VarChar(20)
+  name         String   @db.VarChar(255)
+  account_type String   @db.VarChar(50)
+  parent_id    Int?
+  is_active    Boolean? @default(true)
+  created_at   DateTime? @default(now()) @db.Timestamp(0)
+  updated_at   DateTime? @default(now()) @updatedAt @db.Timestamp(0)
+  parent       chart_of_accounts?  @relation("CoAParent", fields: [parent_id], references: [id])
+  children     chart_of_accounts[] @relation("CoAParent")
+  journal_entry_lines journal_entry_lines[]
+  expense_categories expense_categories[]
+  @@index([code])
+  @@index([account_type])
+  @@index([parent_id])
+  @@map("chart_of_accounts")
+}
+
+model journal_entries {
+  id            BigInt   @id @default(autoincrement())
+  entry_number  String   @unique @db.VarChar(50)
+  entry_date    DateTime @db.Date
+  description   String?  @db.Text
+  reference_type String? @db.VarChar(50)
+  reference_id  BigInt?
+  status        String?  @default("draft") @db.VarChar(50)
+  posted_at     DateTime? @db.Timestamp(0)
+  created_at    DateTime? @default(now()) @db.Timestamp(0)
+  created_by    BigInt?
+  journal_entry_lines journal_entry_lines[]
+  cash_expenses cash_expenses[]
+  @@index([entry_number])
+  @@index([entry_date])
+  @@index([status])
+  @@map("journal_entries")
+}
+
+model journal_entry_lines {
+  id              BigInt   @id @default(autoincrement())
+  journal_entry_id BigInt
+  account_id      Int
+  debit           Decimal? @default(0) @db.Decimal(15, 2)
+  credit          Decimal? @default(0) @db.Decimal(15, 2)
+  description     String?  @db.Text
+  journal_entry   journal_entries @relation(fields: [journal_entry_id], references: [id], onDelete: Cascade)
+  account         chart_of_accounts @relation(fields: [account_id], references: [id])
+  @@index([journal_entry_id])
+  @@index([account_id])
+  @@map("journal_entry_lines")
+}
+
+// ========== INVENTORY ==========
+model product_categories {
+  id         Int      @id @default(autoincrement())
+  code       String   @unique @db.VarChar(50)
+  name       String   @db.VarChar(255)
+  parent_id  Int?
+  is_active  Boolean? @default(true)
+  created_at DateTime? @default(now()) @db.Timestamp(0)
+  updated_at DateTime? @default(now()) @updatedAt @db.Timestamp(0)
+  deleted_at DateTime? @db.Timestamp(0)
+  created_by BigInt?
+  updated_by BigInt?
+  parent     product_categories? @relation("CategoryParent", fields: [parent_id], references: [id])
+  children   product_categories[] @relation("CategoryParent")
+  products   products[]
+  @@index([code])
+  @@index([deleted_at])
+  @@map("product_categories")
+}
+
+model product_units {
+  id         Int      @id @default(autoincrement())
+  code       String   @unique @db.VarChar(20)
+  name       String   @db.VarChar(100)
+  is_active  Boolean? @default(true)
+  created_at DateTime? @default(now()) @db.Timestamp(0)
+  updated_at DateTime? @default(now()) @updatedAt @db.Timestamp(0)
+  products   products[]
+  product_unit_conversions_from product_unit_conversions[] @relation("FromUnit")
+  product_unit_conversions_to   product_unit_conversions[] @relation("ToUnit")
+  product_prices product_prices[]
+  consignment_receipt_items consignment_receipt_items[]
+  stock_movements stock_movements[]
+  consignment_sales consignment_sales[]
+  pos_transaction_items pos_transaction_items[]
+  member_order_items member_order_items[]
+  @@map("product_units")
+}
+
+model products {
+  id           BigInt   @id @default(autoincrement())
+  code         String   @unique @db.VarChar(50)
+  name         String   @db.VarChar(255)
+  barcode      String?  @db.VarChar(100)
+  category_id  Int?
+  base_unit_id Int
+  description  String?  @db.Text
+  min_stock    Decimal? @default(0) @db.Decimal(15, 3)
+  is_active    Boolean? @default(true)
+  created_at   DateTime? @default(now()) @db.Timestamp(0)
+  updated_at   DateTime? @default(now()) @updatedAt @db.Timestamp(0)
+  deleted_at   DateTime? @db.Timestamp(0)
+  created_by   BigInt?
+  updated_by   BigInt?
+  category     product_categories? @relation(fields: [category_id], references: [id])
+  base_unit    product_units @relation(fields: [base_unit_id], references: [id])
+  product_unit_conversions product_unit_conversions[]
+  product_prices product_prices[]
+  warehouse_stock warehouse_stock[]
+  stock_movements stock_movements[]
+  consignment_receipt_items consignment_receipt_items[]
+  consignment_stock consignment_stock[]
+  consignment_sales consignment_sales[]
+  pos_transaction_items pos_transaction_items[]
+  member_order_items member_order_items[]
+  @@index([code])
+  @@index([barcode])
+  @@index([category_id])
+  @@index([deleted_at])
+  @@map("products")
+}
+
+model product_unit_conversions {
+  id                BigInt   @id @default(autoincrement())
+  product_id        BigInt
+  from_unit_id      Int
+  to_unit_id        Int
+  conversion_factor Decimal  @db.Decimal(15, 6)
+  created_at        DateTime? @default(now()) @db.Timestamp(0)
+  updated_at        DateTime? @default(now()) @updatedAt @db.Timestamp(0)
+  product           products @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  from_unit         product_units @relation("FromUnit", fields: [from_unit_id], references: [id])
+  to_unit           product_units @relation("ToUnit", fields: [to_unit_id], references: [id])
+  @@unique([product_id, from_unit_id, to_unit_id])
+  @@index([product_id])
+  @@map("product_unit_conversions")
+}
+
+model warehouses {
+  id         BigInt   @id @default(autoincrement())
+  code       String   @unique @db.VarChar(50)
+  name       String   @db.VarChar(255)
+  address    String?  @db.Text
+  is_active  Boolean? @default(true)
+  created_at DateTime? @default(now()) @db.Timestamp(0)
+  updated_at DateTime? @default(now()) @updatedAt @db.Timestamp(0)
+  deleted_at DateTime? @db.Timestamp(0)
+  created_by BigInt?
+  updated_by BigInt?
+  product_prices product_prices[]
+  warehouse_stock warehouse_stock[]
+  stock_movements_from stock_movements[] @relation("FromWarehouse")
+  stock_movements_to   stock_movements[] @relation("ToWarehouse")
+  consignment_receipts consignment_receipts[]
+  consignment_stock consignment_stock[]
+  consignment_sales consignment_sales[]
+  pos_transactions pos_transactions[]
+  member_orders member_orders[]
+  @@index([code])
+  @@index([deleted_at])
+  @@map("warehouses")
+}
+
+model product_prices {
+  id             BigInt   @id @default(autoincrement())
+  product_id     BigInt
+  warehouse_id   BigInt?
+  unit_id        Int
+  price          Decimal  @db.Decimal(15, 2)
+  effective_date DateTime @db.Date
+  expiry_date    DateTime? @db.Date
+  is_active      Boolean? @default(true)
+  created_at     DateTime? @default(now()) @db.Timestamp(0)
+  updated_at     DateTime? @default(now()) @updatedAt @db.Timestamp(0)
+  created_by     BigInt?
+  product        products  @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  warehouse      warehouses? @relation(fields: [warehouse_id], references: [id])
+  unit           product_units @relation(fields: [unit_id], references: [id])
+  @@index([product_id])
+  @@index([warehouse_id])
+  @@index([effective_date])
+  @@map("product_prices")
+}
+
+model warehouse_stock {
+  id           BigInt   @id @default(autoincrement())
+  warehouse_id BigInt
+  product_id   BigInt
+  quantity     Decimal  @db.Decimal(15, 3)
+  updated_at   DateTime? @default(now()) @updatedAt @db.Timestamp(0)
+  warehouse    warehouses @relation(fields: [warehouse_id], references: [id], onDelete: Cascade)
+  product      products   @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  @@unique([warehouse_id, product_id])
+  @@index([warehouse_id])
+  @@index([product_id])
+  @@map("warehouse_stock")
+}
+
+model stock_movements {
+  id               BigInt   @id @default(autoincrement())
+  movement_number  String   @unique @db.VarChar(50)
+  movement_type    String   @db.VarChar(50)
+  warehouse_id     BigInt
+  product_id       BigInt
+  quantity         Decimal  @db.Decimal(15, 3)
+  unit_id          Int
+  reference_type   String?  @db.VarChar(50)
+  reference_id     BigInt?
+  to_warehouse_id  BigInt?
+  notes            String?  @db.Text
+  movement_date    DateTime @db.Date
+  created_at       DateTime? @default(now()) @db.Timestamp(0)
+  created_by       BigInt?
+  warehouse        warehouses @relation("FromWarehouse", fields: [warehouse_id], references: [id], onDelete: Cascade)
+  product          products   @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  unit             product_units @relation(fields: [unit_id], references: [id])
+  to_warehouse     warehouses? @relation("ToWarehouse", fields: [to_warehouse_id], references: [id], onDelete: SetNull)
+  @@index([movement_number])
+  @@index([warehouse_id])
+  @@index([product_id])
+  @@index([movement_date])
+  @@index([movement_type])
+  @@map("stock_movements")
+}
+
+// ========== CONSIGNMENT ==========
+model consignment_suppliers {
+  id               BigInt   @id @default(autoincrement())
+  code             String   @unique @db.VarChar(50)
+  name             String   @db.VarChar(255)
+  contact_person   String?  @db.VarChar(255)
+  phone            String?  @db.VarChar(50)
+  address          String?  @db.Text
+  commission_type  String?  @default("percentage") @db.VarChar(50)
+  commission_value Decimal  @db.Decimal(15, 2)
+  is_active        Boolean? @default(true)
+  created_at       DateTime? @default(now()) @db.Timestamp(0)
+  updated_at       DateTime? @default(now()) @updatedAt @db.Timestamp(0)
+  deleted_at       DateTime? @db.Timestamp(0)
+  created_by       BigInt?
+  updated_by       BigInt?
+  consignment_receipts consignment_receipts[]
+  consignment_stock consignment_stock[]
+  consignment_settlements consignment_settlements[]
+  consignment_sales consignment_sales[]
+  @@index([code])
+  @@index([deleted_at])
+  @@map("consignment_suppliers")
+}
+
+model consignment_receipts {
+  id            BigInt   @id @default(autoincrement())
+  receipt_number String   @unique @db.VarChar(50)
+  supplier_id   BigInt
+  warehouse_id  BigInt
+  receipt_date  DateTime @db.Date
+  notes         String?  @db.Text
+  status        String?  @default("draft") @db.VarChar(50)
+  posted_at     DateTime? @db.Timestamp(0)
+  created_at    DateTime? @default(now()) @db.Timestamp(0)
+  created_by    BigInt?
+  supplier      consignment_suppliers @relation(fields: [supplier_id], references: [id], onDelete: Cascade)
+  warehouse     warehouses @relation(fields: [warehouse_id], references: [id], onDelete: Cascade)
+  consignment_receipt_items consignment_receipt_items[]
+  @@index([receipt_number])
+  @@index([supplier_id])
+  @@index([receipt_date])
+  @@map("consignment_receipts")
+}
+
+model consignment_receipt_items {
+  id                    BigInt   @id @default(autoincrement())
+  consignment_receipt_id BigInt
+  product_id            BigInt
+  quantity              Decimal  @db.Decimal(15, 3)
+  unit_id               Int
+  notes                 String?  @db.Text
+  consignment_receipt   consignment_receipts @relation(fields: [consignment_receipt_id], references: [id], onDelete: Cascade)
+  product               products @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  unit                  product_units @relation(fields: [unit_id], references: [id])
+  @@index([consignment_receipt_id])
+  @@map("consignment_receipt_items")
+}
+
+model consignment_stock {
+  id           BigInt   @id @default(autoincrement())
+  supplier_id  BigInt
+  warehouse_id BigInt
+  product_id   BigInt
+  quantity     Decimal  @db.Decimal(15, 3)
+  updated_at   DateTime? @default(now()) @updatedAt @db.Timestamp(0)
+  supplier     consignment_suppliers @relation(fields: [supplier_id], references: [id], onDelete: Cascade)
+  warehouse    warehouses @relation(fields: [warehouse_id], references: [id], onDelete: Cascade)
+  product      products   @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  @@unique([supplier_id, warehouse_id, product_id])
+  @@index([supplier_id])
+  @@index([warehouse_id])
+  @@index([product_id])
+  @@map("consignment_stock")
+}
+
+model consignment_settlements {
+  id                 BigInt   @id @default(autoincrement())
+  settlement_number  String   @unique @db.VarChar(50)
+  supplier_id        BigInt
+  settlement_date    DateTime @db.Date
+  total_sales_amount Decimal  @db.Decimal(15, 2)
+  total_commission   Decimal  @db.Decimal(15, 2)
+  net_payable        Decimal  @db.Decimal(15, 2)
+  status             String?  @default("draft") @db.VarChar(50)
+  notes              String?  @db.Text
+  created_at         DateTime? @default(now()) @db.Timestamp(0)
+  created_by         BigInt?
+  supplier           consignment_suppliers @relation(fields: [supplier_id], references: [id], onDelete: Cascade)
+  consignment_sales  consignment_sales[]
+  @@index([settlement_number])
+  @@index([supplier_id])
+  @@index([settlement_date])
+  @@map("consignment_settlements")
+}
+
+model consignment_sales {
+  id               BigInt   @id @default(autoincrement())
+  supplier_id      BigInt
+  product_id       BigInt
+  warehouse_id     BigInt
+  quantity         Decimal  @db.Decimal(15, 3)
+  unit_id          Int
+  unit_price       Decimal  @db.Decimal(15, 2)
+  total_amount     Decimal  @db.Decimal(15, 2)
+  commission_rate  Decimal  @db.Decimal(5, 2)
+  commission_amount Decimal  @db.Decimal(15, 2)
+  sale_date        DateTime @db.Date
+  settlement_id    BigInt?
+  reference_type   String?  @db.VarChar(50)
+  reference_id    BigInt?
+  created_at       DateTime? @default(now()) @db.Timestamp(0)
+  supplier         consignment_suppliers @relation(fields: [supplier_id], references: [id], onDelete: Cascade)
+  product          products   @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  warehouse        warehouses  @relation(fields: [warehouse_id], references: [id], onDelete: Cascade)
+  unit             product_units @relation(fields: [unit_id], references: [id])
+  settlement       consignment_settlements? @relation(fields: [settlement_id], references: [id], onDelete: SetNull)
+  @@index([supplier_id])
+  @@index([sale_date])
+  @@index([settlement_id])
+  @@map("consignment_sales")
+}
+
+// ========== POS ==========
+model pos_devices {
+  id          BigInt   @id @default(autoincrement())
+  code        String   @unique @db.VarChar(50)
+  name        String   @db.VarChar(255)
+  device_fingerprint String? @db.VarChar(255)
+  is_active   Boolean? @default(true)
+  created_at  DateTime? @default(now()) @db.Timestamp(0)
+  updated_at  DateTime? @default(now()) @updatedAt @db.Timestamp(0)
+  pos_sessions pos_sessions[]
+  @@map("pos_devices")
+}
+
+model pos_sessions {
+  id          BigInt   @id @default(autoincrement())
+  device_id   BigInt
+  user_id     BigInt
+  opened_at   DateTime @default(now()) @db.Timestamp(0)
+  closed_at   DateTime? @db.Timestamp(0)
+  opening_cash Decimal? @db.Decimal(15, 2)
+  closing_cash Decimal? @db.Decimal(15, 2)
+  status      String?  @default("open") @db.VarChar(20)
+  device      pos_devices @relation(fields: [device_id], references: [id], onDelete: Cascade)
+  user        users @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  pos_transactions pos_transactions[]
+  @@index([device_id])
+  @@index([user_id])
+  @@index([opened_at])
+  @@map("pos_sessions")
+}
+
+model pos_transactions {
+  id              BigInt   @id @default(autoincrement())
+  transaction_number String @unique @db.VarChar(50)
+  session_id      BigInt
+  member_id       BigInt
+  warehouse_id    BigInt
+  subtotal        Decimal  @db.Decimal(15, 2)
+  discount_amount Decimal? @default(0) @db.Decimal(15, 2)
+  total_amount    Decimal  @db.Decimal(15, 2)
+  status          String?  @default("completed") @db.VarChar(20)
+  transaction_date DateTime @db.Timestamp(0)
+  notes           String?  @db.Text
+  created_at      DateTime? @default(now()) @db.Timestamp(0)
+  created_by      BigInt?
+  session         pos_sessions @relation(fields: [session_id], references: [id], onDelete: Cascade)
+  member          members @relation(fields: [member_id], references: [id], onDelete: Cascade)
+  warehouse       warehouses @relation(fields: [warehouse_id], references: [id], onDelete: Cascade)
+  pos_transaction_items pos_transaction_items[]
+  pos_payments    pos_payments[]
+  member_receivables member_receivables[]
+  @@index([transaction_number])
+  @@index([session_id])
+  @@index([member_id])
+  @@index([transaction_date])
+  @@map("pos_transactions")
+}
+
+model pos_transaction_items {
+  id              BigInt   @id @default(autoincrement())
+  pos_transaction_id BigInt
+  product_id      BigInt
+  quantity        Decimal  @db.Decimal(15, 3)
+  unit_id         Int
+  unit_price      Decimal  @db.Decimal(15, 2)
+  discount_amount Decimal? @default(0) @db.Decimal(15, 2)
+  total_amount    Decimal  @db.Decimal(15, 2)
+  transaction     pos_transactions @relation(fields: [pos_transaction_id], references: [id], onDelete: Cascade)
+  product         products @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  unit            product_units @relation(fields: [unit_id], references: [id])
+  @@index([pos_transaction_id])
+  @@map("pos_transaction_items")
+}
+
+model pos_payments {
+  id              BigInt   @id @default(autoincrement())
+  pos_transaction_id BigInt
+  payment_method  String   @db.VarChar(50)
+  amount          Decimal  @db.Decimal(15, 2)
+  reference_number String? @db.VarChar(100)
+  notes           String?  @db.Text
+  transaction     pos_transactions @relation(fields: [pos_transaction_id], references: [id], onDelete: Cascade)
+  @@index([pos_transaction_id])
+  @@map("pos_payments")
+}
+
+model member_receivables {
+  id              BigInt   @id @default(autoincrement())
+  member_id       BigInt
+  pos_transaction_id BigInt
+  amount          Decimal  @db.Decimal(15, 2)
+  due_month       Int
+  due_year        Int
+  status          String?  @default("pending") @db.VarChar(20)
+  paid_at         DateTime? @db.Timestamp(0)
+  paid_amount     Decimal? @db.Decimal(15, 2)
+  created_at      DateTime? @default(now()) @db.Timestamp(0)
+  member          members @relation(fields: [member_id], references: [id], onDelete: Cascade)
+  pos_transaction pos_transactions @relation(fields: [pos_transaction_id], references: [id], onDelete: Cascade)
+  @@index([member_id])
+  @@index([pos_transaction_id])
+  @@index([due_year, due_month])
+  @@index([status])
+  @@map("member_receivables")
+}
+
+// ========== ONLINE ORDERS ==========
+model member_orders {
+  id              BigInt   @id @default(autoincrement())
+  order_number    String   @unique @db.VarChar(50)
+  member_id       BigInt
+  warehouse_id    BigInt
+  total_amount    Decimal  @db.Decimal(15, 2)
+  status          String?  @default("pending") @db.VarChar(50)
+  order_date      DateTime @db.Timestamp(0)
+  confirmed_at    DateTime? @db.Timestamp(0)
+  delivered_at    DateTime? @db.Timestamp(0)
+  cancelled_at    DateTime? @db.Timestamp(0)
+  notes           String?  @db.Text
+  created_at      DateTime? @default(now()) @db.Timestamp(0)
+  member          members @relation(fields: [member_id], references: [id], onDelete: Cascade)
+  warehouse       warehouses @relation(fields: [warehouse_id], references: [id], onDelete: Cascade)
+  member_order_items member_order_items[]
+  @@index([order_number])
+  @@index([member_id])
+  @@index([order_date])
+  @@index([status])
+  @@map("member_orders")
+}
+
+model member_order_items {
+  id              BigInt   @id @default(autoincrement())
+  member_order_id BigInt
+  product_id      BigInt
+  quantity        Decimal  @db.Decimal(15, 3)
+  unit_id         Int
+  unit_price      Decimal  @db.Decimal(15, 2)
+  total_amount    Decimal  @db.Decimal(15, 2)
+  order           member_orders @relation(fields: [member_order_id], references: [id], onDelete: Cascade)
+  product         products @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  unit            product_units @relation(fields: [unit_id], references: [id])
+  @@index([member_order_id])
+  @@map("member_order_items")
+}
+
+// ========== EXPENSES ==========
+model expense_categories {
+  id          Int      @id @default(autoincrement())
+  code        String   @unique @db.VarChar(50)
+  name        String   @db.VarChar(255)
+  account_id  Int?
+  is_active   Boolean? @default(true)
+  created_at  DateTime? @default(now()) @db.Timestamp(0)
+  updated_at  DateTime? @default(now()) @updatedAt @db.Timestamp(0)
+  deleted_at  DateTime? @db.Timestamp(0)
+  created_by  BigInt?
+  updated_by  BigInt?
+  account     chart_of_accounts? @relation(fields: [account_id], references: [id])
+  cash_expenses cash_expenses[]
+  @@index([code])
+  @@index([deleted_at])
+  @@map("expense_categories")
+}
+
+model cash_expenses {
+  id               BigInt   @id @default(autoincrement())
+  expense_number   String   @unique @db.VarChar(50)
+  category_id      Int
+  amount           Decimal  @db.Decimal(15, 2)
+  expense_date     DateTime @db.Date
+  description      String?  @db.Text
+  reference_number String?  @db.VarChar(100)
+  journal_entry_id BigInt?
+  created_at       DateTime? @default(now()) @db.Timestamp(0)
+  updated_at       DateTime? @default(now()) @updatedAt @db.Timestamp(0)
+  deleted_at       DateTime? @db.Timestamp(0)
+  created_by       BigInt?
+  updated_by       BigInt?
+  category         expense_categories @relation(fields: [category_id], references: [id], onDelete: Restrict)
+  journal_entry    journal_entries?   @relation(fields: [journal_entry_id], references: [id])
+  expense_attachments expense_attachments[]
+  @@index([expense_number])
+  @@index([expense_date])
+  @@index([category_id])
+  @@index([deleted_at])
+  @@map("cash_expenses")
+}
+
+model expense_attachments {
+  id             BigInt   @id @default(autoincrement())
+  cash_expense_id BigInt
+  file_path      String   @db.VarChar(500)
+  file_name      String   @db.VarChar(255)
+  file_size      BigInt?
+  mime_type      String?  @db.VarChar(100)
+  created_at     DateTime? @default(now()) @db.Timestamp(0)
+  cash_expense   cash_expenses @relation(fields: [cash_expense_id], references: [id], onDelete: Cascade)
+  @@index([cash_expense_id])
+  @@map("expense_attachments")
+}
+
+// ========== NOTIFICATIONS ==========
+model notifications {
+  id          BigInt   @id @default(autoincrement())
+  user_id     BigInt?
+  title       String   @db.VarChar(255)
+  message     String?  @db.Text
+  type        String?  @default("info") @db.VarChar(50)
+  entity_type String?  @db.VarChar(100)
+  entity_id   BigInt?
+  is_read     Boolean? @default(false)
+  read_at     DateTime? @db.Timestamp(0)
+  created_at  DateTime? @default(now()) @db.Timestamp(0)
+  @@index([user_id])
+  @@index([is_read])
+  @@index([created_at])
+  @@map("notifications")
+}
+
+model notification_preferences {
+  id               BigInt   @id @default(autoincrement())
+  user_id          BigInt   @unique
+  loan_reminder    Boolean? @default(true)
+  savings_reminder Boolean? @default(true)
+  stock_alert      Boolean? @default(true)
+  created_at       DateTime? @default(now()) @db.Timestamp(0)
+  updated_at       DateTime? @default(now()) @updatedAt @db.Timestamp(0)
+  @@map("notification_preferences")
+}
+
+// ========== AUDIT ==========
+model audit_logs {
+  id          BigInt   @id @default(autoincrement())
+  user_id     BigInt?
+  action      String   @db.VarChar(100)
+  entity_type String   @db.VarChar(100)
+  entity_id   BigInt?
+  old_values  Json?
+  new_values  Json?
+  ip_address  String?  @db.VarChar(45)
+  user_agent  String?  @db.Text
+  created_at  DateTime? @default(now()) @db.Timestamp(0)
+  @@index([user_id])
+  @@index([entity_type, entity_id])
+  @@index([created_at])
+  @@map("audit_logs")
+}

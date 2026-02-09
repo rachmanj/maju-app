@@ -1,64 +1,94 @@
-import Image from "next/image";
+import { Button, Card, Row, Col, Tag } from "antd";
 
-export default function Home() {
+async function checkDatabase() {
+  try {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/health`, {
+      cache: 'no-store'
+    });
+    return await response.json();
+  } catch (error) {
+    return { status: 'error', error: 'Failed to connect to API' };
+  }
+}
+
+export default async function Home() {
+  const dbStatus = await checkDatabase();
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <main className="w-full max-w-4xl space-y-8">
+        <div className="text-center space-y-2">
+          <h1 className="text-4xl font-bold tracking-tight">Maju App</h1>
+          <p className="text-muted-foreground">
+            Next.js + TypeScript + MySQL + Ant Design Boilerplate
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+
+        <Row gutter={[16, 16]}>
+          <Col xs={24} md={12}>
+            <Card title="Database Status" extra={<Tag color={dbStatus.status === 'ok' ? 'success' : 'error'}>
+              {dbStatus.status === 'ok' ? 'Connected' : 'Disconnected'}
+            </Tag>}>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Database:</span>
+                  <span className="text-sm font-medium">{dbStatus.database || 'N/A'}</span>
+                </div>
+                {dbStatus.timestamp && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm">Last Check:</span>
+                    <span className="text-sm text-muted-foreground">
+                      {new Date(dbStatus.timestamp).toLocaleTimeString()}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </Card>
+          </Col>
+
+          <Col xs={24} md={12}>
+            <Card title="Tech Stack">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Framework:</span>
+                  <span className="text-sm font-medium">Next.js 16</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Language:</span>
+                  <span className="text-sm font-medium">TypeScript</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Database:</span>
+                  <span className="text-sm font-medium">MySQL</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">UI Library:</span>
+                  <span className="text-sm font-medium">Ant Design</span>
+                </div>
+              </div>
+            </Card>
+          </Col>
+        </Row>
+
+        <Card title="Quick Start">
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">
+                1. Configure your database connection in <code className="px-1 py-0.5 bg-muted rounded">.env.local</code>
+              </p>
+              <p className="text-sm text-muted-foreground">
+                2. Create your database: <code className="px-1 py-0.5 bg-muted rounded">CREATE DATABASE maju_app;</code>
+              </p>
+              <p className="text-sm text-muted-foreground">
+                3. Start the development server: <code className="px-1 py-0.5 bg-muted rounded">npm run dev</code>
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button type="primary">Get Started</Button>
+              <Button>View Docs</Button>
+            </div>
+          </div>
+        </Card>
       </main>
     </div>
   );
