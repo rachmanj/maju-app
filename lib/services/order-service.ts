@@ -144,7 +144,7 @@ export class OrderService {
     confirmed_at: Date | null;
     delivered_at: Date | null;
     notes: string | null;
-    items: { product_id: number; product_name: string; quantity: number; unit_code: string; unit_price: number; total_amount: number }[];
+    items: { id: number; product_id: number; product_name: string; quantity: number; unit_code: string; unit_price: number; total_amount: number }[];
   } | null> {
     const order = await prisma.member_orders.findUnique({
       where: { id },
@@ -175,6 +175,7 @@ export class OrderService {
       delivered_at: order.delivered_at,
       notes: order.notes,
       items: order.member_order_items.map((i) => ({
+        id: Number(i.id),
         product_id: Number(i.product_id),
         product_name: i.product.name,
         quantity: Number(i.quantity),

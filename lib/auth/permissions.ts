@@ -50,6 +50,7 @@ export type Permission = typeof PERMISSIONS[keyof typeof PERMISSIONS];
 export const ROLE_PERMISSIONS: Record<string, Permission[]> = {
   superadmin: Object.values(PERMISSIONS),
   manager: [
+    PERMISSIONS.ADMIN_USERS,
     PERMISSIONS.MEMBER_VIEW,
     PERMISSIONS.MEMBER_APPROVE,
     PERMISSIONS.SAVINGS_VIEW,

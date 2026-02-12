@@ -62,10 +62,22 @@ export class MemberService {
     });
     if (!m) return null;
     return {
-      ...m,
       id: Number(m.id),
+      nik: m.nik,
+      name: m.name,
+      email: m.email ?? undefined,
+      phone: m.phone ?? undefined,
+      address: m.address ?? undefined,
+      job_title: m.job_title ?? undefined,
+      status: m.status ?? 'pending',
+      joined_date: m.joined_date ? m.joined_date.toISOString().split('T')[0] : undefined,
+      project_id: m.project_id != null ? Number(m.project_id) : undefined,
       project_name: m.project?.name,
       project_code: m.project?.code,
+      created_by: m.created_by != null ? Number(m.created_by) : undefined,
+      updated_by: m.updated_by != null ? Number(m.updated_by) : undefined,
+      created_at: m.created_at?.toISOString(),
+      updated_at: m.updated_at?.toISOString(),
     } as unknown as Member;
   }
 
@@ -99,9 +111,19 @@ export class MemberService {
       prisma.members.count({ where }),
     ]);
     const list = members.map((m) => ({
-      ...m,
       id: Number(m.id),
+      nik: m.nik,
+      name: m.name,
+      email: m.email ?? undefined,
+      phone: m.phone ?? undefined,
+      address: m.address ?? undefined,
+      job_title: m.job_title ?? undefined,
+      status: m.status ?? 'pending',
+      joined_date: m.joined_date ? m.joined_date.toISOString().split('T')[0] : undefined,
+      project_id: m.project_id ?? undefined,
       project_name: m.project?.name,
+      created_at: m.created_at?.toISOString(),
+      updated_at: m.updated_at?.toISOString(),
     }));
     return { members: list as unknown as Member[], total };
   }

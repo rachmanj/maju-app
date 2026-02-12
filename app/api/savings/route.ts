@@ -12,9 +12,15 @@ export async function GET(request: NextRequest) {
 
     const searchParams = request.nextUrl.searchParams;
     const memberId = searchParams.get('member_id');
+    const typeId = searchParams.get('type_id');
 
     if (memberId) {
       const accounts = await SavingsService.getMemberSavingsAccounts(parseInt(memberId));
+      return NextResponse.json(accounts);
+    }
+
+    if (typeId) {
+      const accounts = await SavingsService.getAccountsByType(parseInt(typeId));
       return NextResponse.json(accounts);
     }
 

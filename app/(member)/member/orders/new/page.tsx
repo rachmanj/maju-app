@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Card, Select, Input, Button, Table, Spin, message } from "antd";
+import { Card, Select, Input, Button, Table, Spin, App } from "antd";
 import { PlusOutlined, DeleteOutlined } from "@ant-design/icons";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -33,6 +33,7 @@ interface CartItem {
 }
 
 export default function MemberNewOrderPage() {
+  const { message } = App.useApp();
   const router = useRouter();
   const [warehouses, setWarehouses] = useState<WarehouseOption[]>([]);
   const [products, setProducts] = useState<ProductOption[]>([]);

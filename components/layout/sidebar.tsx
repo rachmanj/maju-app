@@ -7,6 +7,7 @@ import type { MenuProps } from "antd";
 import {
   DashboardOutlined,
   UserOutlined,
+  TeamOutlined,
   WalletOutlined,
   CreditCardOutlined,
   InboxOutlined,
@@ -20,27 +21,40 @@ import {
   ShoppingOutlined,
 } from "@ant-design/icons";
 import { useSidebar } from "@/lib/hooks/use-sidebar";
+import { useSession } from "next-auth/react";
+import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
 
-const menuItems: MenuProps["items"] = [
-  { key: "/dashboard", label: "Dashboard", icon: <DashboardOutlined /> },
-  { key: "/dashboard/members", label: "Anggota", icon: <UserOutlined /> },
-  { key: "/dashboard/savings", label: "Simpanan", icon: <WalletOutlined /> },
-  { key: "/dashboard/loans", label: "Pinjaman", icon: <CreditCardOutlined /> },
-  { key: "/dashboard/accounting", label: "Akuntansi", icon: <AccountBookOutlined /> },
-  { key: "/dashboard/inventory", label: "Inventory", icon: <InboxOutlined /> },
-  { key: "/dashboard/pos", label: "POS", icon: <ShoppingCartOutlined /> },
-  { key: "/dashboard/receivables", label: "Piutang", icon: <DollarOutlined /> },
-  { key: "/dashboard/expenses", label: "Pengeluaran", icon: <DollarOutlined /> },
-  { key: "/dashboard/orders", label: "Pesanan", icon: <ShoppingOutlined /> },
-  { key: "/dashboard/accounting/reports", label: "Laporan", icon: <FileTextOutlined /> },
-  { key: "/dashboard/reports/daily", label: "Laporan Harian", icon: <FileTextOutlined /> },
-  { key: "/dashboard/settings", label: "Pengaturan", icon: <SettingOutlined /> },
-];
+function useMenuItems(): MenuProps["items"] {
+  const { data: session } = useSession();
+  const roles = (session?.user as { roles?: string[] })?.roles ?? [];
+  const showUsers = hasPermission(roles, PERMISSIONS.ADMIN_USERS);
+
+  const items: MenuProps["items"] = [
+    { key: "/dashboard", label: "Dashboard", icon: <DashboardOutlined /> },
+    { key: "/dashboard/members", label: "Anggota", icon: <UserOutlined /> },
+    ...(showUsers
+      ? [{ key: "/dashboard/users", label: "Pengguna", icon: <TeamOutlined /> }]
+      : []),
+    { key: "/dashboard/savings", label: "Simpanan", icon: <WalletOutlined /> },
+    { key: "/dashboard/loans", label: "Pinjaman", icon: <CreditCardOutlined /> },
+    { key: "/dashboard/accounting", label: "Akuntansi", icon: <AccountBookOutlined /> },
+    { key: "/dashboard/inventory", label: "Inventory", icon: <InboxOutlined /> },
+    { key: "/dashboard/pos", label: "POS", icon: <ShoppingCartOutlined /> },
+    { key: "/dashboard/receivables", label: "Piutang", icon: <DollarOutlined /> },
+    { key: "/dashboard/expenses", label: "Pengeluaran", icon: <DollarOutlined /> },
+    { key: "/dashboard/orders", label: "Pesanan", icon: <ShoppingOutlined /> },
+    { key: "/dashboard/accounting/reports", label: "Laporan", icon: <FileTextOutlined /> },
+    { key: "/dashboard/reports/daily", label: "Laporan Harian", icon: <FileTextOutlined /> },
+    { key: "/dashboard/settings", label: "Pengaturan", icon: <SettingOutlined /> },
+  ];
+  return items;
+}
 
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { isCollapsed, toggle } = useSidebar();
+  const menuItems = useMenuItems();
   
   useEffect(() => {
     // Auto-collapse on mobile

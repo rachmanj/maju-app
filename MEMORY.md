@@ -1,5 +1,5 @@
 **Purpose**: AI's persistent knowledge base for project context and learnings
-**Last Updated**: 2026-02-08
+**Last Updated**: 2026-02-12
 
 ## Memory Maintenance Guidelines
 
@@ -26,6 +26,52 @@
 ---
 
 ## Project Memory Entries
+
+### [010] Modul Anggota - Chrome DevTools MCP Test & getMemberById BigInt Fix (2026-02-12) ✅ COMPLETE
+
+**Challenge**: Test all Anggota module features via Chrome DevTools MCP; member detail page returned 500.
+
+**Solution**:
+- Admin Members: list, search, create, view detail, edit, approve—all passed. Fixed getMemberById BigInt serialization (same pattern as MEMORY [006]): map Prisma result to plain object with Number() for BigInt fields before JSON response.
+- Member Portal (budi@example.com / NIK): dashboard, Simpanan, Pinjaman, Transaksi, Pesanan, Buat Pesanan—all passed. Anggota redirects to /member, sees member-scoped data.
+
+**Key Learning**: Chrome DevTools MCP enables systematic E2E testing without Cypress/Playwright. Member API GET single-by-id must explicitly serialize BigInt like listMembers; spread of raw Prisma result fails JSON.stringify.
+
+**Files**: `lib/services/member-service.ts` (getMemberById), MEMORY.md
+
+---
+
+### [009] Module Simpanan - Setor/Tarik & P2 Improvements (2026-02-11) ✅ COMPLETE
+
+**Challenge**: Implement P1 Setor/Tarik flow and P2 improvements per test report.
+
+**Solution**:
+- P1: SavingsAccountsList modal—member Select (search), fetch accounts, show account or "Buat Rekening", amount/reference/notes form, call deposit/withdraw API
+- P2 Lihat Rekening: toggle button per type → table of accounts via GET /api/savings?type_id=X (getAccountsByType)
+- P2 Buat Rekening: POST /api/savings/accounts, "Buat Rekening" button in modal when member has no account for that type
+- Fixed members API BigInt serialization (listMembers returns plain objects for JSON)
+
+**Key Learning**: Member select with onSearch + fetchMembers(limit=50, status=active) provides sufficient UX. Create-account flow integrates naturally in deposit modal.
+
+**Files**: `components/savings/savings-accounts-list.tsx`, `app/api/savings/accounts/route.ts`, `lib/services/savings-service.ts`, `lib/services/member-service.ts`
+
+---
+
+### [008] Users Management Module (2026-02-11) ✅ COMPLETE
+
+**Challenge**: Implement CRUD for system users with role assignment, respecting RBAC and preventing self-lockout.
+
+**Solution**:
+- UserService with list/create/update/delete (soft delete via deleted_at); bcrypt for passwords; role assignment via user_roles
+- API routes protected by ADMIN_USERS; DELETE blocks when target user id === current user id
+- Sidebar uses useMenuItems() with useSession + hasPermission to show "Pengguna" only for Superadmin/Manager
+- Page-level redirect when user lacks ADMIN_USERS; Chrome DevTools MCP test validated full CRUD and self-delete protection
+
+**Key Learning**: Permission-based sidebar visibility (`hasPermission(roles, PERMISSIONS.ADMIN_USERS)`) provides consistent UX—users see only menus they can access. Self-delete guard in API (not just UI) prevents accidental lockout even if client is bypassed.
+
+**Files**: `lib/services/user-service.ts`, `app/api/users/*`, `app/api/roles/route.ts`, `components/users/*`, `components/layout/sidebar.tsx`
+
+---
 
 ### [004] Prisma 7 ORM Migration (2026-02-08) ✅ COMPLETE
 

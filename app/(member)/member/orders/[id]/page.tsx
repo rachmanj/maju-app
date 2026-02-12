@@ -17,7 +17,7 @@ interface OrderDetail {
   confirmed_at: string | null;
   delivered_at: string | null;
   notes: string | null;
-  items: { product_name: string; quantity: number; unit_code: string; unit_price: number; total_amount: number }[];
+  items: { id: number; product_name: string; quantity: number; unit_code: string; unit_price: number; total_amount: number }[];
 }
 
 export default function MemberOrderDetailPage() {
@@ -118,7 +118,7 @@ export default function MemberOrderDetailPage() {
       </Card>
       <Card title="Detail Barang" className="shadow-sm">
         <Table
-          rowKey={(_, i) => String(i)}
+          rowKey="id"
           columns={columns}
           dataSource={order.items}
           pagination={false}

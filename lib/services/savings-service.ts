@@ -25,6 +25,22 @@ export class SavingsService {
     return row ? toAccount(row as any) : null;
   }
 
+  static async getAccountsByType(savingsTypeId: number): Promise<(SavingsAccount & { member_name?: string; member_nik?: string })[]> {
+    const rows = await prisma.savings_accounts.findMany({
+      where: { savings_type_id: savingsTypeId, closed_date: null },
+      include: {
+        savings_type: { select: { code: true, name: true } },
+        member: { select: { name: true, nik: true } },
+      },
+      orderBy: { account_number: 'asc' },
+    });
+    return rows.map((r) => ({
+      ...toAccount(r as any),
+      member_name: (r as any).member?.name,
+      member_nik: (r as any).member?.nik,
+    }));
+  }
+
   static async getMemberSavingsAccounts(memberId: number): Promise<SavingsAccount[]> {
     const rows = await prisma.savings_accounts.findMany({
       where: { member_id: memberId, closed_date: null },
