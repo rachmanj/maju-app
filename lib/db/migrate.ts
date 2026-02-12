@@ -3,27 +3,52 @@ import path from 'path';
 import mysql from 'mysql2/promise';
 import bcrypt from 'bcryptjs';
 
-// Create a fresh database connection for migrations
-function getDbConnection() {
-  return mysql.createConnection({
+function parseDbConfig(): { host: string; port: number; user: string; password: string; database: string } {
+  const url = process.env.DATABASE_URL;
+  if (url && typeof url === 'string' && url.startsWith('mysql://')) {
+    try {
+      const parsed = new URL(url);
+      return {
+        host: parsed.hostname || 'localhost',
+        port: parsed.port ? parseInt(parsed.port) : 3306,
+        user: decodeURIComponent(parsed.username || 'root'),
+        password: decodeURIComponent(parsed.password || ''),
+        database: parsed.pathname?.replace(/^\//, '') || 'maju_app',
+      };
+    } catch {
+      // fall through to DB_* vars
+    }
+  }
+  return {
     host: process.env.DB_HOST || 'localhost',
     port: parseInt(process.env.DB_PORT || '3306'),
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
     database: process.env.DB_NAME || 'maju_app',
+  };
+}
+
+function getDbConnection() {
+  const cfg = parseDbConfig();
+  return mysql.createConnection({
+    host: cfg.host,
+    port: cfg.port,
+    user: cfg.user,
+    password: cfg.password,
+    database: cfg.database,
   });
 }
 
 export async function runMigrations() {
   try {
-    const dbName = process.env.DB_NAME || 'maju_app';
-    
-    // First, connect without database to create it if needed
+    const cfg = parseDbConfig();
+    const dbName = cfg.database;
+
     const adminConnection = await mysql.createConnection({
-      host: process.env.DB_HOST || 'localhost',
-      port: parseInt(process.env.DB_PORT || '3306'),
-      user: process.env.DB_USER || 'root',
-      password: process.env.DB_PASSWORD || '',
+      host: cfg.host,
+      port: cfg.port,
+      user: cfg.user,
+      password: cfg.password,
     });
     
     try {
