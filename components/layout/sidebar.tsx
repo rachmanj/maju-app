@@ -28,6 +28,7 @@ function useMenuItems(): MenuProps["items"] {
   const { data: session } = useSession();
   const roles = (session?.user as { roles?: string[] })?.roles ?? [];
   const showUsers = hasPermission(roles, PERMISSIONS.ADMIN_USERS);
+  const showSettings = hasPermission(roles, PERMISSIONS.ADMIN_SETTINGS);
 
   const items: MenuProps["items"] = [
     { key: "/dashboard", label: "Dashboard", icon: <DashboardOutlined /> },
@@ -45,7 +46,9 @@ function useMenuItems(): MenuProps["items"] {
     { key: "/dashboard/orders", label: "Pesanan", icon: <ShoppingOutlined /> },
     { key: "/dashboard/accounting/reports", label: "Laporan", icon: <FileTextOutlined /> },
     { key: "/dashboard/reports/daily", label: "Laporan Harian", icon: <FileTextOutlined /> },
-    { key: "/dashboard/settings", label: "Pengaturan", icon: <SettingOutlined /> },
+    ...(showSettings
+      ? [{ key: "/dashboard/settings", label: "Pengaturan", icon: <SettingOutlined /> }]
+      : []),
   ];
   return items;
 }

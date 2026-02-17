@@ -1,11 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { Button, Avatar, Dropdown } from "antd";
-import { UserOutlined, LogoutOutlined } from "@ant-design/icons";
+import { UserOutlined, LogoutOutlined, LockOutlined } from "@ant-design/icons";
 import type { MenuProps } from "antd";
 import Link from "next/link";
+import { ChangePasswordModal } from "@/components/auth/change-password-modal";
 
 const navItems = [
   { href: "/member/dashboard", label: "Dashboard" },
@@ -18,6 +20,7 @@ const navItems = [
 export function MemberPortalNav() {
   const pathname = usePathname();
   const { data: session } = useSession();
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
 
   const menuItems: MenuProps["items"] = [
     {
@@ -29,6 +32,13 @@ export function MemberPortalNav() {
         </div>
       ),
       disabled: true,
+    },
+    { type: "divider" },
+    {
+      key: "change-password",
+      label: "Ubah Password",
+      icon: <LockOutlined />,
+      onClick: () => setChangePasswordOpen(true),
     },
     { type: "divider" },
     {
@@ -65,6 +75,10 @@ export function MemberPortalNav() {
             <Avatar icon={<UserOutlined />} size="small" className="!bg-teal-500 !text-white" />
           </Button>
         </Dropdown>
+        <ChangePasswordModal
+          open={changePasswordOpen}
+          onClose={() => setChangePasswordOpen(false)}
+        />
       </div>
     </header>
   );

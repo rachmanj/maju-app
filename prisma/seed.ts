@@ -109,6 +109,14 @@ async function main() {
     });
   }
 
+  const coopConfigCount = await prisma.cooperative_config.count();
+  if (coopConfigCount === 0) {
+    await prisma.cooperative_config.create({
+      data: { name: 'Koperasi Maju', address: null, phone: null, email: null, logo_url: null },
+    });
+    console.log('Cooperative config seeded');
+  }
+
   const adminEmail = process.env.ADMIN_EMAIL || 'admin@koperasimaju.com';
   const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
   const adminName = process.env.ADMIN_NAME || 'Administrator';

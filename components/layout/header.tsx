@@ -1,14 +1,17 @@
 "use client";
 
+import { useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { Button, Dropdown, Avatar } from "antd";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { NotificationCenter } from "@/components/notifications/notification-center";
-import { UserOutlined, LogoutOutlined } from "@ant-design/icons";
+import { ChangePasswordModal } from "@/components/auth/change-password-modal";
+import { UserOutlined, LogoutOutlined, LockOutlined } from "@ant-design/icons";
 import type { MenuProps } from "antd";
 
 export function Header() {
   const { data: session } = useSession();
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
 
   const menuItems: MenuProps["items"] = [
     {
@@ -20,6 +23,15 @@ export function Header() {
         </div>
       ),
       disabled: true,
+    },
+    {
+      type: "divider",
+    },
+    {
+      key: "change-password",
+      label: "Ubah Password",
+      icon: <LockOutlined />,
+      onClick: () => setChangePasswordOpen(true),
     },
     {
       type: "divider",
@@ -44,18 +56,24 @@ export function Header() {
         <ThemeToggle />
         {session?.user && <NotificationCenter />}
         {session?.user && (
-          <Dropdown menu={{ items: menuItems }} placement="bottomRight" trigger={["click"]}>
-            <Button
-              type="text"
-              className="!flex !h-9 !w-9 !items-center !justify-center !rounded-full !border-0 !p-0 hover:!bg-teal-500/10"
-            >
-              <Avatar
-                icon={<UserOutlined />}
-                size="small"
-                className="!bg-teal-500 !text-white"
-              />
-            </Button>
-          </Dropdown>
+          <>
+            <Dropdown menu={{ items: menuItems }} placement="bottomRight" trigger={["click"]}>
+              <Button
+                type="text"
+                className="!flex !h-9 !w-9 !items-center !justify-center !rounded-full !border-0 !p-0 hover:!bg-teal-500/10"
+              >
+                <Avatar
+                  icon={<UserOutlined />}
+                  size="small"
+                  className="!bg-teal-500 !text-white"
+                />
+              </Button>
+            </Dropdown>
+            <ChangePasswordModal
+              open={changePasswordOpen}
+              onClose={() => setChangePasswordOpen(false)}
+            />
+          </>
         )}
       </div>
     </header>

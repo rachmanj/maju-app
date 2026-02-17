@@ -1,7 +1,93 @@
-import { Card } from "antd";
-import { SettingOutlined } from "@ant-design/icons";
+"use client";
+
+import { useEffect } from "react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { Card, Tabs } from "antd";
+import { SettingOutlined, UserOutlined, DollarOutlined, BankOutlined } from "@ant-design/icons";
+import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
+import { UserPreferencesForm } from "@/components/settings/user-preferences-form";
+import { NotificationPreferencesForm } from "@/components/settings/notification-preferences-form";
+import { SavingsInterestRatesTable } from "@/components/settings/savings-interest-rates-table";
+import { LoanInterestRatesTable } from "@/components/settings/loan-interest-rates-table";
+import { CooperativeConfigForm } from "@/components/settings/cooperative-config-form";
 
 export default function SettingsPage() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (status === "loading") return;
+    if (!session) {
+      router.push("/login");
+      return;
+    }
+    const roles = (session.user as { roles?: string[] })?.roles ?? [];
+    if (!hasPermission(roles, PERMISSIONS.ADMIN_SETTINGS)) {
+      router.push("/dashboard");
+    }
+  }, [session, status, router]);
+
+  if (status === "loading") {
+    return <div className="p-6">Memuat...</div>;
+  }
+
+  const roles = (session?.user as { roles?: string[] })?.roles ?? [];
+  if (!hasPermission(roles, PERMISSIONS.ADMIN_SETTINGS)) {
+    return null;
+  }
+
+  const tabItems = [
+    {
+      key: "preferences",
+      label: (
+        <span>
+          <UserOutlined className="mr-2" />
+          Preferensi Pengguna
+        </span>
+      ),
+      children: (
+        <div className="space-y-6">
+          <UserPreferencesForm />
+          <NotificationPreferencesForm />
+        </div>
+      ),
+    },
+    {
+      key: "interest-rates",
+      label: (
+        <span>
+          <DollarOutlined className="mr-2" />
+          Tarif Bunga
+        </span>
+      ),
+      children: (
+        <div className="space-y-6">
+          <Card title="Bunga Simpanan">
+            <SavingsInterestRatesTable />
+          </Card>
+          <Card title="Bunga Pinjaman">
+            <LoanInterestRatesTable />
+          </Card>
+        </div>
+      ),
+    },
+    {
+      key: "cooperative",
+      label: (
+        <span>
+          <BankOutlined className="mr-2" />
+          Konfigurasi Koperasi
+        </span>
+      ),
+      children: (
+        <Card>
+          <CooperativeConfigForm />
+        </Card>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div>
@@ -9,13 +95,7 @@ export default function SettingsPage() {
         <p className="text-muted-foreground">Konfigurasi sistem dan preferensi</p>
       </div>
       <Card>
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <SettingOutlined className="text-6xl text-muted-foreground mb-4" />
-          <h3 className="text-lg font-medium mb-2">Modul dalam pengembangan</h3>
-          <p className="text-muted-foreground">
-            Fitur pengaturan akan segera tersedia
-          </p>
-        </div>
+        <Tabs defaultActiveKey="preferences" items={tabItems} />
       </Card>
     </div>
   );
