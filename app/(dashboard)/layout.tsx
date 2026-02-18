@@ -5,9 +5,11 @@ import { DashboardRedirect } from "@/components/auth/dashboard-redirect";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { useSidebar } from "@/lib/hooks/use-sidebar";
+import { useHeartbeat } from "@/lib/hooks/use-heartbeat";
 
 function DashboardContent({ children }: { children: React.ReactNode }) {
   const { isCollapsed } = useSidebar();
+  useHeartbeat("dashboard");
   return (
     <div
       className="flex min-w-0 flex-1 flex-col overflow-hidden transition-[margin] duration-300"

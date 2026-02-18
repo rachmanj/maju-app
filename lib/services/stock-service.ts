@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db/prisma';
+import { AuditService } from './audit-service';
 
 export class StockService {
   static async getStockByWarehouse(warehouseId: number): Promise<
@@ -109,6 +110,18 @@ export class StockService {
         });
       }
       return m;
+    });
+    await AuditService.log({
+      user_id: params.created_by,
+      action: `stock.${params.movement_type}`,
+      entity_type: 'stock_movement',
+      entity_id: Number(movement.id),
+      new_values: {
+        movement_type: params.movement_type,
+        warehouse_id: params.warehouse_id,
+        product_id: params.product_id,
+        quantity: params.quantity,
+      },
     });
     return Number(movement.id);
   }

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db/prisma";
+import { AuditService } from "./audit-service";
 
 export interface SavingsInterestRateItem {
   id: number;
@@ -67,6 +68,13 @@ export class SettingsService {
           logo_url: data.logo_url ?? existing.logo_url,
         },
       });
+      await AuditService.log({
+        action: "settings.cooperative_config",
+        entity_type: "cooperative_config",
+        entity_id: existing.id,
+        old_values: { name: existing.name },
+        new_values: { name: updated.name },
+      });
       return {
         id: updated.id,
         name: updated.name,
@@ -85,6 +93,12 @@ export class SettingsService {
         email: data.email ?? null,
         logo_url: data.logo_url ?? null,
       },
+    });
+    await AuditService.log({
+      action: "settings.cooperative_config",
+      entity_type: "cooperative_config",
+      entity_id: created.id,
+      new_values: { name: created.name },
     });
     return {
       id: created.id,

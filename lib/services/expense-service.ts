@@ -73,6 +73,7 @@ export class ExpenseService {
     reference_number?: string;
     createJournal?: boolean;
     created_by?: number;
+    requestContext?: { ip_address?: string | null; user_agent?: string | null };
   }): Promise<{ id: number; journal_entry_id?: number }> {
     const category = await prisma.expense_categories.findFirst({
       where: { id: data.category_id, deleted_at: null },
@@ -134,6 +135,8 @@ export class ExpenseService {
       entity_type: 'cash_expense',
       entity_id: Number(expense.id),
       new_values: { expense_number: expenseNumber, amount: data.amount, category_id: data.category_id },
+      ip_address: data.requestContext?.ip_address,
+      user_agent: data.requestContext?.user_agent,
     });
     return { id: Number(expense.id), journal_entry_id: journalEntryId };
   }

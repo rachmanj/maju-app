@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db/prisma';
 import type { Member } from '@/types/database';
 import bcrypt from 'bcryptjs';
+import { AuditService } from './audit-service';
 
 export class MemberService {
   static async createMember(data: {
@@ -55,6 +56,13 @@ export class MemberService {
         });
       }
       return m;
+    });
+    await AuditService.log({
+      user_id: data.created_by,
+      action: 'member.create',
+      entity_type: 'member',
+      entity_id: Number(member.id),
+      new_values: { nik: data.nik, name: data.name },
     });
     return Number(member.id);
   }
@@ -149,6 +157,10 @@ export class MemberService {
   }
 
   static async updateMember(id: number, data: Partial<Member>, updatedBy?: number): Promise<void> {
+    const existing = await prisma.members.findUnique({
+      where: { id },
+      select: { name: true, nik: true, status: true },
+    });
     const update: Record<string, unknown> = { ...data };
     delete update.id;
     delete update.created_at;
@@ -160,6 +172,14 @@ export class MemberService {
     await prisma.members.update({
       where: { id },
       data: update as Parameters<typeof prisma.members.update>[0]['data'],
+    });
+    await AuditService.log({
+      user_id: updatedBy,
+      action: 'member.update',
+      entity_type: 'member',
+      entity_id: id,
+      old_values: existing ? { name: existing.name, nik: existing.nik } : undefined,
+      new_values: { name: data.name, nik: data.nik },
     });
   }
 
@@ -208,6 +228,13 @@ export class MemberService {
           }
         }
       }
+    });
+    await AuditService.log({
+      user_id: approvedBy,
+      action: 'member.approve',
+      entity_type: 'member',
+      entity_id: id,
+      new_values: { status: 'active' },
     });
   }
 

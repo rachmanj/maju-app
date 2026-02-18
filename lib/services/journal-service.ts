@@ -72,7 +72,11 @@ export class JournalService {
     return Number(entry.id);
   }
 
-  static async postEntry(journalId: number, userId?: number): Promise<void> {
+  static async postEntry(
+    journalId: number,
+    userId?: number,
+    requestContext?: { ip_address?: string | null; user_agent?: string | null }
+  ): Promise<void> {
     const entry = await prisma.journal_entries.findFirst({
       where: { id: journalId, status: 'draft' },
     });
@@ -87,6 +91,8 @@ export class JournalService {
       entity_type: 'journal_entry',
       entity_id: journalId,
       new_values: { entry_number: entry.entry_number },
+      ip_address: requestContext?.ip_address,
+      user_agent: requestContext?.user_agent,
     });
   }
 

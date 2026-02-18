@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db/prisma';
 import type { Loan, LoanApplication, LoanSchedule } from '@/types/database';
 import { LoanCalculator } from '../utils/loan-calculator';
+import { AuditService } from './audit-service';
 
 export class LoanService {
   static async createApplication(data: {
@@ -75,6 +76,13 @@ export class LoanService {
         });
       }
       return l;
+    });
+    await AuditService.log({
+      user_id: data.approved_by,
+      action: 'loan.approve',
+      entity_type: 'loan',
+      entity_id: Number(loan.id),
+      new_values: { loan_number: loan.loan_number, principal_amount: Number(loan.principal_amount) },
     });
     return Number(loan.id);
   }
@@ -234,6 +242,13 @@ export class LoanService {
         });
       }
       return pay;
+    });
+    await AuditService.log({
+      user_id: data.created_by,
+      action: 'loan.payment',
+      entity_type: 'loan',
+      entity_id: data.loan_id,
+      new_values: { payment_amount: data.payment_amount, payment_date: data.payment_date },
     });
     return Number(payment.id);
   }

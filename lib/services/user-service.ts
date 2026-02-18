@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db/prisma';
 import bcrypt from 'bcryptjs';
+import { AuditService } from './audit-service';
 
 export interface UserListItem {
   id: number;
@@ -143,6 +144,13 @@ export class UserService {
       return u;
     });
 
+    await AuditService.log({
+      user_id: createdBy,
+      action: 'user.create',
+      entity_type: 'user',
+      entity_id: Number(user.id),
+      new_values: { email: data.email, name: data.name },
+    });
     return Number(user.id);
   }
 
@@ -161,6 +169,7 @@ export class UserService {
   ): Promise<void> {
     const existing = await prisma.users.findFirst({
       where: { id, deleted_at: null },
+      include: { user_roles: { select: { role_id: true } } },
     });
     if (!existing) throw new Error('User tidak ditemukan');
 
@@ -207,6 +216,21 @@ export class UserService {
         }
       }
     });
+
+    const oldRoles = existing.user_roles.map((ur) => ur.role_id);
+    const newRoles = data.role_ids ?? oldRoles;
+    await AuditService.log({
+      user_id: updatedBy,
+      action: 'user.update',
+      entity_type: 'user',
+      entity_id: id,
+      old_values: { name: existing.name, email: existing.email, role_ids: oldRoles },
+      new_values: {
+        name: data.name ?? existing.name,
+        email: data.email ?? existing.email,
+        role_ids: newRoles,
+      },
+    });
   }
 
   static async deleteUser(id: number, deletedBy?: number): Promise<void> {
@@ -218,6 +242,14 @@ export class UserService {
     await prisma.users.update({
       where: { id },
       data: { deleted_at: new Date(), updated_by: deletedBy ?? null },
+    });
+
+    await AuditService.log({
+      user_id: deletedBy,
+      action: 'user.delete',
+      entity_type: 'user',
+      entity_id: id,
+      old_values: { email: existing.email, name: existing.name },
     });
   }
 }

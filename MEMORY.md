@@ -1,5 +1,5 @@
 **Purpose**: AI's persistent knowledge base for project context and learnings
-**Last Updated**: 2026-02-17
+**Last Updated**: 2026-02-18
 
 ## Memory Maintenance Guidelines
 
@@ -26,6 +26,39 @@
 ---
 
 ## Project Memory Entries
+
+### [013] Audit Log & Monitoring Feature (2026-02-18) ✅ COMPLETE
+
+**Challenge**: Implement full audit log feature and monitoring (who's online, member activity stats) per plan.
+
+**Solution**:
+- **Permissions**: ADMIN_AUDIT (superadmin, manager, pengawas), ADMIN_MONITORING (superadmin, manager, pengurus, pengawas)
+- **AuditService**: Extended log() with ip_address, user_agent; added listLogs() with filters; getRequestContext() helper
+- **Audit coverage**: user (create/update/delete), member (create/update/approve), loan (approve, payment), savings (deposit/withdraw/account_create), journal.post, cash_expense.create, stock movements, settings (cooperative_config)
+- **Audit UI**: GET /api/audit-logs, /dashboard/audit-logs page with filters
+- **Monitoring**: user_activity table; heartbeat (POST /api/monitoring/heartbeat) from useHeartbeat hook every 2 min; GET /api/monitoring/online-users, /api/monitoring/member-activity; /dashboard/monitoring page (Who's Online + Member Activity stats)
+
+**Key Learning**: Prisma.membersWhereInput type assertion for dynamic OR conditions; useHeartbeat in both dashboard and member layouts for activity tracking.
+
+**Files**: `lib/auth/permissions.ts`, `lib/services/audit-service.ts`, `lib/services/monitoring-service.ts`, `lib/services/user-service.ts`, `lib/services/member-service.ts`, `lib/services/loan-service.ts`, `lib/services/savings-service.ts`, `lib/services/stock-service.ts`, `lib/services/settings-service.ts`, `app/api/audit-logs/route.ts`, `app/api/monitoring/*`, `app/(dashboard)/dashboard/audit-logs/page.tsx`, `app/(dashboard)/dashboard/monitoring/page.tsx`, `components/audit/audit-logs-table.tsx`, `components/monitoring/*`, `lib/hooks/use-heartbeat.ts`, `prisma/schema.prisma` (user_activity, audit_logs relation)
+
+---
+
+### [012] Member Module: Nomor Anggota, Projects & Departments, Ant Design Fixes (2026-02-18) ✅ COMPLETE
+
+**Challenge**: Extend member module with Nomor Anggota (unique, nullable), project and department selections; fix Ant Design deprecations; production build TypeScript error.
+
+**Solution**:
+- **Nomor Anggota**: Added `member_number` (unique, nullable) to members; list, detail, new, edit forms; search; P2002 handling for duplicate
+- **Projects & Departments**: New `departments` table (code, name); Projects CRUD already had schema; both in Pengaturan tabs (Proyek, Departemen) with full CRUD; member forms get project_id/department_id Select from GET /api/projects, /api/departments (MEMBER_VIEW)
+- **Ant Design**: Modal `destroyOnClose` → `destroyOnHidden` (deprecation); member orders new page `message` → `App.useApp()`; order detail Table `rowKey` index → `rowKey="id"` (item id from API)
+- **Build fix**: Added `department_id` to `MemberFormData` interface in members/new/page.tsx
+
+**Key Learning**: When adding form fields that POST to API, ensure the form values interface includes all fields used in the request body to avoid production build TypeScript errors.
+
+**Files**: `prisma/schema.prisma`, `lib/services/member-service.ts`, `lib/services/project-service.ts`, `lib/services/department-service.ts`, `app/api/settings/projects/*`, `app/api/settings/departments/*`, `app/api/projects/route.ts`, `app/api/departments/route.ts`, `components/settings/projects-table.tsx`, `components/settings/departments-table.tsx`, `app/(dashboard)/dashboard/settings/page.tsx`, `app/(dashboard)/dashboard/members/*`, `components/members/members-table.tsx`, `app/(member)/member/orders/new/page.tsx`, `app/(member)/member/orders/[id]/page.tsx`, `lib/services/order-service.ts`
+
+---
 
 ### [011] Pengaturan Module Implementation & Production Build Fix (2026-02-17) ✅ COMPLETE
 

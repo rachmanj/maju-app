@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth/config';
 import { ExpenseService } from '@/lib/services/expense-service';
+import { getRequestContext } from '@/lib/services/audit-service';
 import { hasPermission, PERMISSIONS } from '@/lib/auth/permissions';
 
 export async function GET(request: NextRequest) {
@@ -50,6 +51,7 @@ export async function POST(request: NextRequest) {
       reference_number: reference_number ? String(reference_number) : undefined,
       createJournal: !!create_journal,
       created_by: session.user?.id ? parseInt(String(session.user.id)) : undefined,
+      requestContext: getRequestContext(request),
     });
     return NextResponse.json(result, { status: 201 });
   } catch (error: any) {

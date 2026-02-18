@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth/config';
+import { getRequestContext } from '@/lib/services/audit-service';
 import { hasPermission, PERMISSIONS } from '@/lib/auth/permissions';
 import { JournalService } from '@/lib/services/journal-service';
 
@@ -43,7 +44,7 @@ export async function POST(
     const body = await request.json().catch(() => ({}));
     if (body.action === 'post') {
       const userId = session.user?.id ? parseInt(String(session.user.id)) : undefined;
-      await JournalService.postEntry(parseInt(id), userId);
+      await JournalService.postEntry(parseInt(id), userId, getRequestContext(request));
       return NextResponse.json({ message: 'Journal entry posted' });
     }
 

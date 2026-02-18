@@ -19,6 +19,8 @@ import {
   MenuUnfoldOutlined,
   DollarOutlined,
   ShoppingOutlined,
+  AuditOutlined,
+  LineChartOutlined,
 } from "@ant-design/icons";
 import { useSidebar } from "@/lib/hooks/use-sidebar";
 import { useSession } from "next-auth/react";
@@ -29,6 +31,8 @@ function useMenuItems(): MenuProps["items"] {
   const roles = (session?.user as { roles?: string[] })?.roles ?? [];
   const showUsers = hasPermission(roles, PERMISSIONS.ADMIN_USERS);
   const showSettings = hasPermission(roles, PERMISSIONS.ADMIN_SETTINGS);
+  const showAudit = hasPermission(roles, PERMISSIONS.ADMIN_AUDIT);
+  const showMonitoring = hasPermission(roles, PERMISSIONS.ADMIN_MONITORING);
 
   const items: MenuProps["items"] = [
     { key: "/dashboard", label: "Dashboard", icon: <DashboardOutlined /> },
@@ -46,6 +50,12 @@ function useMenuItems(): MenuProps["items"] {
     { key: "/dashboard/orders", label: "Pesanan", icon: <ShoppingOutlined /> },
     { key: "/dashboard/accounting/reports", label: "Laporan", icon: <FileTextOutlined /> },
     { key: "/dashboard/reports/daily", label: "Laporan Harian", icon: <FileTextOutlined /> },
+    ...(showAudit
+      ? [{ key: "/dashboard/audit-logs", label: "Audit Log", icon: <AuditOutlined /> }]
+      : []),
+    ...(showMonitoring
+      ? [{ key: "/dashboard/monitoring", label: "Monitoring", icon: <LineChartOutlined /> }]
+      : []),
     ...(showSettings
       ? [{ key: "/dashboard/settings", label: "Pengaturan", icon: <SettingOutlined /> }]
       : []),

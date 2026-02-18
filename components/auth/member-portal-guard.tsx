@@ -3,9 +3,11 @@
 import { useSession } from "next-auth/react";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
+import { useHeartbeat } from "@/lib/hooks/use-heartbeat";
 
 export function MemberPortalGuard({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
+  useHeartbeat("member_portal");
   const router = useRouter();
   const pathname = usePathname();
   const isUnlinkedPage = pathname === "/member/unlinked";

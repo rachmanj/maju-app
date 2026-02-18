@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db/prisma';
 import type { SavingsAccount, SavingsTransaction, SavingsType } from '@/types/database';
+import { AuditService } from './audit-service';
 
 function toAccount(rows: { id: bigint; member_id: bigint; savings_type_id: number; account_number: string | null; balance: unknown; opened_date: Date; closed_date: Date | null; created_at: Date | null; updated_at: Date | null } & { savings_type?: { code: string; name: string } }): SavingsAccount {
   return {
@@ -81,6 +82,12 @@ export class SavingsService {
       }
       return acc;
     });
+    await AuditService.log({
+      action: 'savings.account_create',
+      entity_type: 'savings_account',
+      entity_id: Number(account.id),
+      new_values: { member_id: memberId, savings_type_id: savingsTypeId },
+    });
     return Number(account.id);
   }
 
@@ -115,6 +122,13 @@ export class SavingsService {
           created_by: createdBy != null ? BigInt(createdBy) : null,
         },
       });
+    });
+    await AuditService.log({
+      user_id: createdBy,
+      action: 'savings.deposit',
+      entity_type: 'savings_account',
+      entity_id: accountId,
+      new_values: { amount },
     });
   }
 
@@ -152,6 +166,13 @@ export class SavingsService {
           created_by: createdBy != null ? BigInt(createdBy) : null,
         },
       });
+    });
+    await AuditService.log({
+      user_id: createdBy,
+      action: 'savings.withdraw',
+      entity_type: 'savings_account',
+      entity_id: accountId,
+      new_values: { amount },
     });
   }
 

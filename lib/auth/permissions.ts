@@ -42,6 +42,8 @@ export const PERMISSIONS = {
   // Admin
   ADMIN_USERS: 'admin.users',
   ADMIN_SETTINGS: 'admin.settings',
+  ADMIN_AUDIT: 'admin.audit',
+  ADMIN_MONITORING: 'admin.monitoring',
 } as const;
 
 export type Permission = typeof PERMISSIONS[keyof typeof PERMISSIONS];
@@ -51,6 +53,8 @@ export const ROLE_PERMISSIONS: Record<string, Permission[]> = {
   superadmin: Object.values(PERMISSIONS),
   manager: [
     PERMISSIONS.ADMIN_USERS,
+    PERMISSIONS.ADMIN_AUDIT,
+    PERMISSIONS.ADMIN_MONITORING,
     PERMISSIONS.MEMBER_VIEW,
     PERMISSIONS.MEMBER_APPROVE,
     PERMISSIONS.SAVINGS_VIEW,
@@ -69,6 +73,7 @@ export const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     PERMISSIONS.ADMIN_SETTINGS,
   ],
   pengurus: [
+    PERMISSIONS.ADMIN_MONITORING,
     PERMISSIONS.MEMBER_VIEW,
     PERMISSIONS.SAVINGS_VIEW,
     PERMISSIONS.SAVINGS_DEPOSIT,
@@ -100,6 +105,8 @@ export const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     PERMISSIONS.POS_TRANSACTION,
   ],
   pengawas: [
+    PERMISSIONS.ADMIN_AUDIT,
+    PERMISSIONS.ADMIN_MONITORING,
     PERMISSIONS.MEMBER_VIEW,
     PERMISSIONS.SAVINGS_VIEW,
     PERMISSIONS.LOAN_VIEW,

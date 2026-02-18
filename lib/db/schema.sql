@@ -964,6 +964,20 @@ CREATE TABLE IF NOT EXISTS cooperative_config (
 -- AUDIT LOGS
 -- ============================================
 
+-- USER ACTIVITY (Who's Online)
+CREATE TABLE IF NOT EXISTS user_activity (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    user_id BIGINT NOT NULL UNIQUE,
+    last_activity_at TIMESTAMP NOT NULL,
+    ip_address VARCHAR(45) NULL,
+    context VARCHAR(50) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_last_activity_at (last_activity_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- AUDIT LOGS
 CREATE TABLE IF NOT EXISTS audit_logs (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     user_id BIGINT NULL,
