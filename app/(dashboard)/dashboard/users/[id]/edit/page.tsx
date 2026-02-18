@@ -14,6 +14,7 @@ interface Role {
 
 interface User {
   id: number;
+  username?: string | null;
   email: string;
   name: string;
   phone?: string | null;
@@ -77,6 +78,7 @@ export default function EditUserPage() {
         }
         const user: User = await response.json();
         form.setFieldsValue({
+          username: user.username || "",
           email: user.email,
           name: user.name,
           phone: user.phone || "",
@@ -96,6 +98,7 @@ export default function EditUserPage() {
   }, [params.id, form, message, router]);
 
   const onSubmit = async (values: {
+    username?: string;
     email: string;
     password?: string;
     name: string;
@@ -107,6 +110,7 @@ export default function EditUserPage() {
     try {
       setSubmitting(true);
       const body: Record<string, unknown> = {
+        username: values.username?.trim() || null,
         email: values.email,
         name: values.name,
         phone: values.phone || undefined,
@@ -166,6 +170,17 @@ export default function EditUserPage() {
           ) : (
             <>
               <div className="grid gap-4 md:grid-cols-2">
+                <Form.Item
+                  label="Username"
+                  name="username"
+                  rules={[
+                    { max: 50, message: "Username maksimal 50 karakter" },
+                    { pattern: /^[a-zA-Z0-9_-]*$/, message: "Username hanya huruf, angka, underscore, atau strip" },
+                  ]}
+                >
+                  <Input placeholder="username (opsional, untuk login)" />
+                </Form.Item>
+
                 <Form.Item
                   label="Email"
                   name="email"

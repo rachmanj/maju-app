@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { email, password, name, phone, is_active, role_ids } = body;
+    const { username, email, password, name, phone, is_active, role_ids } = body;
 
     if (!email || !password || !name) {
       return NextResponse.json(
@@ -51,6 +51,7 @@ export async function POST(request: NextRequest) {
 
     const userId = await UserService.createUser(
       {
+        username: username?.trim() || undefined,
         email,
         password,
         name,

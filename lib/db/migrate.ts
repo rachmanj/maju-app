@@ -86,7 +86,7 @@ export async function runMigrations() {
             executedCount++;
           } catch (error: any) {
             // Ignore "table already exists" errors
-            if (!error.message.includes('already exists')) {
+            if (!error.message.includes('already exists') && !error.message.includes('Duplicate column')) {
               console.error(`Error executing statement: ${trimmed.substring(0, 50)}...`);
               throw error;
             }
@@ -205,16 +205,24 @@ export async function seedInitialData() {
     
     // Create default admin user (if not exists)
     const adminEmail = process.env.ADMIN_EMAIL || 'admin@koperasimaju.com';
+    const adminUsername = process.env.ADMIN_USERNAME || 'admin';
     const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
     const adminName = process.env.ADMIN_NAME || 'Administrator';
     
     // Check if admin user exists
     const [existingUsers] = await connection.query(
-      'SELECT id FROM users WHERE email = ?',
+      'SELECT id, username FROM users WHERE email = ?',
       [adminEmail]
     );
     
-    if ((existingUsers as any[]).length === 0) {
+    const existingAdmin = (existingUsers as any[])[0];
+    if (existingAdmin && !existingAdmin.username) {
+      await connection.query(
+        'UPDATE users SET username = ? WHERE id = ?',
+        [adminUsername, existingAdmin.id]
+      );
+      console.log(`Admin username set: ${adminUsername}`);
+    } else if (!existingAdmin) {
       // Hash password
       const passwordHash = await bcrypt.hash(adminPassword, 10);
       
@@ -228,9 +236,9 @@ export async function seedInitialData() {
       if (superadminRoleId) {
         // Insert admin user
         const [userResult] = await connection.query(
-          `INSERT INTO users (email, password_hash, name, is_active)
-           VALUES (?, ?, ?, TRUE)`,
-          [adminEmail, passwordHash, adminName]
+          `INSERT INTO users (username, email, password_hash, name, is_active)
+           VALUES (?, ?, ?, ?, TRUE)`,
+          [adminUsername, adminEmail, passwordHash, adminName]
         );
         
         const userId = (userResult as any).insertId;

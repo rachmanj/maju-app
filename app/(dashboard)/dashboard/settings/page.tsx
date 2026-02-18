@@ -4,13 +4,15 @@ import { useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Card, Tabs } from "antd";
-import { SettingOutlined, UserOutlined, DollarOutlined, BankOutlined } from "@ant-design/icons";
+import { SettingOutlined, UserOutlined, DollarOutlined, BankOutlined, ProjectOutlined, ApartmentOutlined } from "@ant-design/icons";
 import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
 import { UserPreferencesForm } from "@/components/settings/user-preferences-form";
 import { NotificationPreferencesForm } from "@/components/settings/notification-preferences-form";
 import { SavingsInterestRatesTable } from "@/components/settings/savings-interest-rates-table";
 import { LoanInterestRatesTable } from "@/components/settings/loan-interest-rates-table";
 import { CooperativeConfigForm } from "@/components/settings/cooperative-config-form";
+import { ProjectsTable } from "@/components/settings/projects-table";
+import { DepartmentsTable } from "@/components/settings/departments-table";
 
 export default function SettingsPage() {
   const { data: session, status } = useSession();
@@ -83,6 +85,34 @@ export default function SettingsPage() {
       children: (
         <Card>
           <CooperativeConfigForm />
+        </Card>
+      ),
+    },
+    {
+      key: "projects",
+      label: (
+        <span>
+          <ProjectOutlined className="mr-2" />
+          Proyek
+        </span>
+      ),
+      children: (
+        <Card title="Data Proyek">
+          <ProjectsTable />
+        </Card>
+      ),
+    },
+    {
+      key: "departments",
+      label: (
+        <span>
+          <ApartmentOutlined className="mr-2" />
+          Departemen
+        </span>
+      ),
+      children: (
+        <Card title="Data Departemen">
+          <DepartmentsTable />
         </Card>
       ),
     },

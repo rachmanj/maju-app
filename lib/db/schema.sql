@@ -9,6 +9,7 @@
 -- Users table
 CREATE TABLE IF NOT EXISTS users (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    username VARCHAR(50) UNIQUE NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     name VARCHAR(255) NOT NULL,
@@ -21,8 +22,11 @@ CREATE TABLE IF NOT EXISTS users (
     created_by BIGINT NULL,
     updated_by BIGINT NULL,
     INDEX idx_email (email),
+    INDEX idx_username (username),
     INDEX idx_deleted_at (deleted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+ALTER TABLE users ADD COLUMN username VARCHAR(50) UNIQUE NULL AFTER id;
 
 -- Roles table
 CREATE TABLE IF NOT EXISTS roles (

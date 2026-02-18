@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { auth } from '@/lib/auth/config';
 import { MemberService } from '@/lib/services/member-service';
 import { hasPermission, PERMISSIONS } from '@/lib/auth/permissions';
@@ -48,10 +49,19 @@ export async function PATCH(
     );
 
     return NextResponse.json({ message: 'Member updated successfully' });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error updating member:', error);
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      const target = (error.meta?.target as string[])?.[0];
+      if (target === 'member_number') {
+        return NextResponse.json({ error: 'Nomor anggota sudah digunakan' }, { status: 400 });
+      }
+      if (target === 'nik') {
+        return NextResponse.json({ error: 'NIK sudah terdaftar' }, { status: 400 });
+      }
+    }
     return NextResponse.json(
-      { error: error.message || 'Failed to update member' },
+      { error: error instanceof Error ? error.message : 'Failed to update member' },
       { status: 500 }
     );
   }

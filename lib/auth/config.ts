@@ -8,7 +8,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     Credentials({
       name: 'Credentials',
       credentials: {
-        email: { label: 'Email', type: 'email' },
+        email: { label: 'Email atau Username', type: 'text' },
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
@@ -16,8 +16,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           return null;
         }
 
+        const identifier = String(credentials.email).trim();
         const u = await prisma.users.findFirst({
-          where: { email: String(credentials.email), deleted_at: null, is_active: true },
+          where: {
+            OR: [
+              { email: identifier },
+              { username: identifier },
+            ],
+            deleted_at: null,
+            is_active: true,
+          },
           include: {
             user_roles: { include: { role: { select: { code: true } } } },
           },

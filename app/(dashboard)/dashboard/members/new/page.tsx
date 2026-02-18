@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Form, Input, Button, Card, App } from "antd";
+import { Form, Input, Button, Card, App, Select } from "antd";
 
 interface MemberFormData {
+  member_number?: string;
   nik: string;
   name: string;
   email?: string;
@@ -12,6 +13,19 @@ interface MemberFormData {
   address?: string;
   job_title?: string;
   project_id?: number;
+  department_id?: number;
+}
+
+interface ProjectOption {
+  id: number;
+  code: string;
+  name: string;
+}
+
+interface DepartmentOption {
+  id: number;
+  code: string;
+  name: string;
 }
 
 export default function NewMemberPage() {
@@ -19,6 +33,18 @@ export default function NewMemberPage() {
   const { message } = App.useApp();
   const [form] = Form.useForm();
   const [isLoading, setIsLoading] = useState(false);
+  const [projects, setProjects] = useState<ProjectOption[]>([]);
+  const [departments, setDepartments] = useState<DepartmentOption[]>([]);
+
+  useEffect(() => {
+    Promise.all([
+      fetch("/api/projects").then((r) => (r.ok ? r.json() : [])),
+      fetch("/api/departments").then((r) => (r.ok ? r.json() : [])),
+    ]).then(([p, d]) => {
+      setProjects(Array.isArray(p) ? p : []);
+      setDepartments(Array.isArray(d) ? d : []);
+    });
+  }, []);
 
   const onSubmit = async (values: MemberFormData) => {
     setIsLoading(true);
@@ -28,7 +54,10 @@ export default function NewMemberPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...values,
+          member_number: values.member_number?.trim() || undefined,
           email: values.email || undefined,
+          project_id: values.project_id || undefined,
+          department_id: values.department_id || undefined,
         }),
       });
 
@@ -61,6 +90,9 @@ export default function NewMemberPage() {
           className="space-y-4"
         >
           <div className="grid gap-4 md:grid-cols-2">
+            <Form.Item label="Nomor Anggota" name="member_number">
+              <Input placeholder="Opsional, unik" />
+            </Form.Item>
             <Form.Item
               label="NIK"
               name="nik"
@@ -96,6 +128,20 @@ export default function NewMemberPage() {
 
             <Form.Item label="Jabatan" name="job_title">
               <Input />
+            </Form.Item>
+            <Form.Item label="Proyek" name="project_id">
+              <Select
+                allowClear
+                placeholder="Pilih proyek"
+                options={projects.map((p) => ({ value: p.id, label: `${p.code} - ${p.name}` }))}
+              />
+            </Form.Item>
+            <Form.Item label="Departemen" name="department_id">
+              <Select
+                allowClear
+                placeholder="Pilih departemen"
+                options={departments.map((d) => ({ value: d.id, label: `${d.code} - ${d.name}` }))}
+              />
             </Form.Item>
           </div>
 

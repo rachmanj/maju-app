@@ -8,12 +8,17 @@ import type { ColumnsType } from "antd/es/table";
 
 interface Member {
   id: number;
+  member_number?: string;
   nik: string;
   name: string;
   email?: string;
   phone?: string;
   status: string;
   joined_date?: string;
+  project_name?: string;
+  project_code?: string;
+  department_name?: string;
+  department_code?: string;
 }
 
 export function MembersTable() {
@@ -64,6 +69,12 @@ export function MembersTable() {
 
   const columns: ColumnsType<Member> = [
     {
+      title: "Nomor Anggota",
+      dataIndex: "member_number",
+      key: "member_number",
+      render: (text) => <span className="font-mono">{text || "-"}</span>,
+    },
+    {
       title: "NIK",
       dataIndex: "nik",
       key: "nik",
@@ -86,6 +97,20 @@ export function MembersTable() {
       dataIndex: "phone",
       key: "phone",
       render: (text) => text || "-",
+    },
+    {
+      title: "Proyek",
+      dataIndex: "project_name",
+      key: "project",
+      render: (_, r) =>
+        r.project_name ? `${r.project_code || ""} - ${r.project_name}`.trim() : "-",
+    },
+    {
+      title: "Departemen",
+      dataIndex: "department_name",
+      key: "department",
+      render: (_, r) =>
+        r.department_name ? `${r.department_code || ""} - ${r.department_name}`.trim() : "-",
     },
     {
       title: "Status",

@@ -68,6 +68,7 @@ export interface Project {
 
 export interface Member {
   id: number;
+  member_number?: string;
   nik: string;
   name: string;
   email?: string;
@@ -75,6 +76,11 @@ export interface Member {
   address?: string;
   job_title?: string;
   project_id?: number;
+  project_name?: string;
+  project_code?: string;
+  department_id?: number;
+  department_name?: string;
+  department_code?: string;
   status: 'pending' | 'active' | 'inactive' | 'resigned';
   joined_date?: Date;
   resigned_date?: Date;

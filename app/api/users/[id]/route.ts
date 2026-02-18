@@ -39,9 +39,10 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const { email, password, name, phone, is_active, role_ids } = body;
+    const { username, email, password, name, phone, is_active, role_ids } = body;
 
     const updateData: Parameters<typeof UserService.updateUser>[1] = {};
+    if (username !== undefined) updateData.username = username?.trim() || null;
     if (email !== undefined) updateData.email = email;
     if (password !== undefined) updateData.password = password;
     if (name !== undefined) updateData.name = name;

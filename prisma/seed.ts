@@ -118,16 +118,23 @@ async function main() {
   }
 
   const adminEmail = process.env.ADMIN_EMAIL || 'admin@koperasimaju.com';
+  const adminUsername = process.env.ADMIN_USERNAME || 'admin';
   const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
   const adminName = process.env.ADMIN_NAME || 'Administrator';
 
   const existing = await prisma.users.findFirst({ where: { email: adminEmail } });
-  if (!existing) {
+  if (existing && !existing.username) {
+    await prisma.users.update({
+      where: { id: existing.id },
+      data: { username: adminUsername },
+    });
+    console.log(`Admin username set: ${adminUsername}`);
+  } else if (!existing) {
     const passwordHash = await bcrypt.hash(adminPassword, 10);
     const superadmin = await prisma.roles.findUnique({ where: { code: 'superadmin' } });
     if (superadmin) {
       const user = await prisma.users.create({
-        data: { email: adminEmail, password_hash: passwordHash, name: adminName, is_active: true },
+        data: { username: adminUsername, email: adminEmail, password_hash: passwordHash, name: adminName, is_active: true },
       });
       await prisma.user_roles.create({
         data: { user_id: user.id, role_id: superadmin.id },

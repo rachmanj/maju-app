@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 
 export class MemberService {
   static async createMember(data: {
+    member_number?: string;
     nik: string;
     name: string;
     email?: string;
@@ -11,12 +12,14 @@ export class MemberService {
     address?: string;
     job_title?: string;
     project_id?: number;
+    department_id?: number;
     joined_date?: Date;
     created_by?: number;
   }): Promise<number> {
     const member = await prisma.$transaction(async (tx) => {
       const m = await tx.members.create({
         data: {
+          member_number: data.member_number?.trim() || null,
           nik: data.nik,
           name: data.name,
           email: data.email ?? null,
@@ -24,6 +27,7 @@ export class MemberService {
           address: data.address ?? null,
           job_title: data.job_title ?? null,
           project_id: data.project_id ?? null,
+          department_id: data.department_id ?? null,
           status: 'pending',
           joined_date: data.joined_date ?? new Date(),
           created_by: data.created_by ?? null,
@@ -58,11 +62,15 @@ export class MemberService {
   static async getMemberById(id: number): Promise<Member | null> {
     const m = await prisma.members.findFirst({
       where: { id, deleted_at: null },
-      include: { project: { select: { name: true, code: true } } },
+      include: {
+        project: { select: { name: true, code: true } },
+        department: { select: { name: true, code: true } },
+      },
     });
     if (!m) return null;
     return {
       id: Number(m.id),
+      member_number: m.member_number ?? undefined,
       nik: m.nik,
       name: m.name,
       email: m.email ?? undefined,
@@ -74,6 +82,9 @@ export class MemberService {
       project_id: m.project_id != null ? Number(m.project_id) : undefined,
       project_name: m.project?.name,
       project_code: m.project?.code,
+      department_id: m.department_id != null ? Number(m.department_id) : undefined,
+      department_name: m.department?.name,
+      department_code: m.department?.code,
       created_by: m.created_by != null ? Number(m.created_by) : undefined,
       updated_by: m.updated_by != null ? Number(m.updated_by) : undefined,
       created_at: m.created_at?.toISOString(),
@@ -95,6 +106,7 @@ export class MemberService {
       where.OR = [
         { name: { contains: params.search } },
         { nik: { contains: params.search } },
+        { member_number: { contains: params.search } },
         { email: { contains: params.search } },
       ];
     }
@@ -103,7 +115,10 @@ export class MemberService {
     const [members, total] = await Promise.all([
       prisma.members.findMany({
         where,
-        include: { project: { select: { name: true } } },
+        include: {
+          project: { select: { name: true, code: true } },
+          department: { select: { name: true, code: true } },
+        },
         orderBy: { created_at: 'desc' },
         skip,
         take: limit,
@@ -112,6 +127,7 @@ export class MemberService {
     ]);
     const list = members.map((m) => ({
       id: Number(m.id),
+      member_number: m.member_number ?? undefined,
       nik: m.nik,
       name: m.name,
       email: m.email ?? undefined,
@@ -122,6 +138,10 @@ export class MemberService {
       joined_date: m.joined_date ? m.joined_date.toISOString().split('T')[0] : undefined,
       project_id: m.project_id ?? undefined,
       project_name: m.project?.name,
+      project_code: m.project?.code,
+      department_id: m.department_id ?? undefined,
+      department_name: m.department?.name,
+      department_code: m.department?.code,
       created_at: m.created_at?.toISOString(),
       updated_at: m.updated_at?.toISOString(),
     }));
@@ -132,6 +152,10 @@ export class MemberService {
     const update: Record<string, unknown> = { ...data };
     delete update.id;
     delete update.created_at;
+    delete update.project_name;
+    delete update.project_code;
+    delete update.department_name;
+    delete update.department_code;
     if (updatedBy != null) update.updated_by = BigInt(updatedBy);
     await prisma.members.update({
       where: { id },

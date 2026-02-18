@@ -2,15 +2,30 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Form, Input, Button, Card, App, Spin } from "antd";
+import { Form, Input, Button, Card, App, Spin, Select } from "antd";
 
 interface MemberFormData {
+  member_number?: string;
   nik: string;
   name: string;
   email?: string;
   phone?: string;
   address?: string;
   job_title?: string;
+  project_id?: number;
+  department_id?: number;
+}
+
+interface ProjectOption {
+  id: number;
+  code: string;
+  name: string;
+}
+
+interface DepartmentOption {
+  id: number;
+  code: string;
+  name: string;
 }
 
 interface Member extends MemberFormData {
@@ -26,6 +41,18 @@ export default function EditMemberPage() {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [projects, setProjects] = useState<ProjectOption[]>([]);
+  const [departments, setDepartments] = useState<DepartmentOption[]>([]);
+
+  useEffect(() => {
+    Promise.all([
+      fetch("/api/projects").then((r) => (r.ok ? r.json() : [])),
+      fetch("/api/departments").then((r) => (r.ok ? r.json() : [])),
+    ]).then(([p, d]) => {
+      setProjects(Array.isArray(p) ? p : []);
+      setDepartments(Array.isArray(d) ? d : []);
+    });
+  }, []);
 
   useEffect(() => {
     const fetchMember = async () => {
@@ -45,12 +72,15 @@ export default function EditMemberPage() {
         }
         const member: Member = await response.json();
         form.setFieldsValue({
+          member_number: member.member_number || "",
           nik: member.nik,
           name: member.name,
           email: member.email || "",
           phone: member.phone || "",
           address: member.address || "",
           job_title: member.job_title || "",
+          project_id: (member as { project_id?: number }).project_id || undefined,
+          department_id: (member as { department_id?: number }).department_id || undefined,
         });
       } catch (error: any) {
         message.error(error.message || "Gagal memuat data anggota");
@@ -72,10 +102,13 @@ export default function EditMemberPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...values,
+          member_number: values.member_number?.trim() || undefined,
           email: values.email || undefined,
           phone: values.phone || undefined,
           address: values.address || undefined,
           job_title: values.job_title || undefined,
+          project_id: values.project_id || undefined,
+          department_id: values.department_id || undefined,
         }),
       });
 
@@ -114,6 +147,9 @@ export default function EditMemberPage() {
           ) : (
           <>
           <div className="grid gap-4 md:grid-cols-2">
+            <Form.Item label="Nomor Anggota" name="member_number">
+              <Input placeholder="Opsional, unik" />
+            </Form.Item>
             <Form.Item
               label="NIK"
               name="nik"
@@ -149,6 +185,20 @@ export default function EditMemberPage() {
 
             <Form.Item label="Jabatan" name="job_title">
               <Input />
+            </Form.Item>
+            <Form.Item label="Proyek" name="project_id">
+              <Select
+                allowClear
+                placeholder="Pilih proyek"
+                options={projects.map((p) => ({ value: p.id, label: `${p.code} - ${p.name}` }))}
+              />
+            </Form.Item>
+            <Form.Item label="Departemen" name="department_id">
+              <Select
+                allowClear
+                placeholder="Pilih departemen"
+                options={departments.map((d) => ({ value: d.id, label: `${d.code} - ${d.name}` }))}
+              />
             </Form.Item>
           </div>
 

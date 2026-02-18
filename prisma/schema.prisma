@@ -12,6 +12,7 @@ datasource db {
 // ========== AUTH & ROLES ==========
 model users {
   id           BigInt   @id @default(autoincrement())
+  username     String?   @unique @db.VarChar(50)
   email        String    @unique @db.VarChar(255)
   password_hash String   @db.VarChar(255)
   name         String    @db.VarChar(255)
@@ -27,6 +28,7 @@ model users {
   user_preferences user_preferences?
   pos_sessions pos_sessions[]
   @@index([email])
+  @@index([username])
   @@index([deleted_at])
   @@map("users")
 }
@@ -109,8 +111,21 @@ model projects {
   @@map("projects")
 }
 
+model departments {
+  id         Int      @id @default(autoincrement())
+  code       String   @unique @db.VarChar(50)
+  name       String   @db.VarChar(255)
+  created_at DateTime? @default(now()) @db.Timestamp(0)
+  updated_at DateTime? @default(now()) @updatedAt @db.Timestamp(0)
+  deleted_at DateTime? @db.Timestamp(0)
+  members    members[]
+  @@index([code])
+  @@map("departments")
+}
+
 model members {
   id            BigInt    @id @default(autoincrement())
+  member_number String?   @unique @db.VarChar(50)
   nik           String    @unique @db.VarChar(16)
   name          String    @db.VarChar(255)
   email         String?   @db.VarChar(255)
@@ -118,6 +133,7 @@ model members {
   address       String?   @db.Text
   job_title     String?   @db.VarChar(255)
   project_id    Int?
+  department_id Int?
   status        String?   @default("pending") @db.VarChar(50)
   joined_date   DateTime? @db.Date
   resigned_date DateTime? @db.Date
@@ -127,6 +143,7 @@ model members {
   created_by    BigInt?
   updated_by    BigInt?
   project       projects? @relation(fields: [project_id], references: [id])
+  department    departments? @relation(fields: [department_id], references: [id])
   member_documents member_documents[]
   member_status_history member_status_history[]
   member_purchase_limits member_purchase_limits?
@@ -139,6 +156,7 @@ model members {
   pos_transactions pos_transactions[]
   member_receivables member_receivables[]
   member_orders member_orders[]
+  @@index([member_number])
   @@index([nik])
   @@index([email])
   @@index([status])

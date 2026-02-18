@@ -9,6 +9,7 @@ import { MemberApprovalButton } from "@/components/members/member-approval-butto
 
 interface Member {
   id: number;
+  member_number?: string;
   nik: string;
   name: string;
   email?: string;
@@ -19,6 +20,8 @@ interface Member {
   joined_date?: string;
   project_name?: string;
   project_code?: string;
+  department_name?: string;
+  department_code?: string;
   created_at?: string;
 }
 
@@ -111,6 +114,9 @@ export default function MemberDetailPage() {
 
       <Card title="Data Anggota">
         <Descriptions column={2} bordered>
+          <Descriptions.Item label="Nomor Anggota">
+            <span className="font-mono">{member.member_number || "-"}</span>
+          </Descriptions.Item>
           <Descriptions.Item label="NIK">
             <span className="font-mono">{member.nik}</span>
           </Descriptions.Item>
@@ -119,9 +125,14 @@ export default function MemberDetailPage() {
           <Descriptions.Item label="Telepon">{member.phone || "-"}</Descriptions.Item>
           <Descriptions.Item label="Jabatan">{member.job_title || "-"}</Descriptions.Item>
           <Descriptions.Item label="Status">{getStatusLabel(member.status)}</Descriptions.Item>
-          <Descriptions.Item label="Project">
+          <Descriptions.Item label="Proyek">
             {member.project_name
               ? `${member.project_code || ""} - ${member.project_name}`.trim()
+              : "-"}
+          </Descriptions.Item>
+          <Descriptions.Item label="Departemen">
+            {member.department_name
+              ? `${member.department_code || ""} - ${member.department_name}`.trim()
               : "-"}
           </Descriptions.Item>
           <Descriptions.Item label="Tanggal Bergabung">

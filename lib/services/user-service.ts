@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 
 export interface UserListItem {
   id: number;
+  username: string | null;
   email: string;
   name: string;
   phone: string | null;
@@ -32,6 +33,7 @@ export class UserService {
       where.OR = [
         { name: { contains: params.search } },
         { email: { contains: params.search } },
+        { username: { contains: params.search } },
         { phone: { contains: params.search } },
       ];
     }
@@ -54,6 +56,7 @@ export class UserService {
 
     const items: UserListItem[] = users.map((u) => ({
       id: Number(u.id),
+      username: u.username,
       email: u.email,
       name: u.name,
       phone: u.phone,
@@ -79,6 +82,7 @@ export class UserService {
 
     return {
       id: Number(u.id),
+      username: u.username,
       email: u.email,
       name: u.name,
       phone: u.phone,
@@ -95,6 +99,7 @@ export class UserService {
 
   static async createUser(
     data: {
+      username?: string;
       email: string;
       password: string;
       name: string;
@@ -104,11 +109,16 @@ export class UserService {
     },
     createdBy?: number
   ): Promise<number> {
-    const existing = await prisma.users.findFirst({
+    const existingEmail = await prisma.users.findFirst({
       where: { email: data.email, deleted_at: null },
     });
-    if (existing) {
-      throw new Error('Email sudah terdaftar');
+    if (existingEmail) throw new Error('Email sudah terdaftar');
+
+    if (data.username) {
+      const existingUsername = await prisma.users.findFirst({
+        where: { username: data.username, deleted_at: null },
+      });
+      if (existingUsername) throw new Error('Username sudah terdaftar');
     }
 
     const passwordHash = await bcrypt.hash(data.password, 10);
@@ -116,6 +126,7 @@ export class UserService {
     const user = await prisma.$transaction(async (tx) => {
       const u = await tx.users.create({
         data: {
+          username: data.username ?? null,
           email: data.email,
           password_hash: passwordHash,
           name: data.name,
@@ -138,6 +149,7 @@ export class UserService {
   static async updateUser(
     id: number,
     data: {
+      username?: string;
       email?: string;
       password?: string;
       name?: string;
@@ -159,6 +171,15 @@ export class UserService {
       if (duplicate) throw new Error('Email sudah terdaftar');
     }
 
+    if (data.username !== undefined && data.username !== existing.username) {
+      if (data.username) {
+        const duplicate = await prisma.users.findFirst({
+          where: { username: data.username, deleted_at: null },
+        });
+        if (duplicate) throw new Error('Username sudah terdaftar');
+      }
+    }
+
     await prisma.$transaction(async (tx) => {
       const updateData: Record<string, unknown> = {
         name: data.name ?? existing.name,
@@ -166,6 +187,7 @@ export class UserService {
         is_active: data.is_active !== undefined ? data.is_active : existing.is_active,
         updated_by: updatedBy ?? null,
       };
+      if (data.username !== undefined) updateData.username = data.username || null;
       if (data.email) updateData.email = data.email;
       if (data.password) {
         updateData.password_hash = await bcrypt.hash(data.password, 10);

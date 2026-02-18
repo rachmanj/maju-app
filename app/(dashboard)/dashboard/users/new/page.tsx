@@ -49,6 +49,7 @@ export default function NewUserPage() {
   }, []);
 
   const onSubmit = async (values: {
+    username?: string;
     email: string;
     password: string;
     name: string;
@@ -63,6 +64,7 @@ export default function NewUserPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...values,
+          username: values.username?.trim() || undefined,
           phone: values.phone || undefined,
           is_active: values.is_active ?? true,
           role_ids: values.role_ids,
@@ -108,6 +110,17 @@ export default function NewUserPage() {
           className="space-y-4"
         >
           <div className="grid gap-4 md:grid-cols-2">
+            <Form.Item
+              label="Username"
+              name="username"
+              rules={[
+                { max: 50, message: "Username maksimal 50 karakter" },
+                { pattern: /^[a-zA-Z0-9_-]+$/, message: "Username hanya huruf, angka, underscore, atau strip" },
+              ]}
+            >
+              <Input placeholder="username (opsional, untuk login)" />
+            </Form.Item>
+
             <Form.Item
               label="Email"
               name="email"

@@ -1,5 +1,5 @@
 **Purpose**: AI's persistent knowledge base for project context and learnings
-**Last Updated**: 2026-02-12
+**Last Updated**: 2026-02-17
 
 ## Memory Maintenance Guidelines
 
@@ -26,6 +26,20 @@
 ---
 
 ## Project Memory Entries
+
+### [011] Pengaturan Module Implementation & Production Build Fix (2026-02-17) ✅ COMPLETE
+
+**Challenge**: Replace "Modul dalam pengembangan" placeholder with functional Settings; production build failed with "Property 'cooperative_config' does not exist on PrismaClient".
+
+**Solution**:
+- Implemented Pengaturan per plan: user preferences (theme, language, notifications), savings/loan interest rates CRUD, cooperative config (cooperative_config table); ADMIN_SETTINGS for sidebar and page access
+- Fixed production build: add `prisma generate` before `next build` in package.json so Prisma client is regenerated from current schema before TypeScript compile
+
+**Key Learning**: On production, Prisma client may be stale if schema changed but generate wasn't run (e.g. cached node_modules, different deploy flow). Build script should explicitly run `prisma generate` before build to ensure types match schema.
+
+**Files**: `package.json` (build script), `lib/services/settings-service.ts`, `app/api/settings/*`, `components/settings/*`, `prisma/schema.prisma`, `components/layout/sidebar.tsx`
+
+---
 
 ### [010] Modul Anggota - Chrome DevTools MCP Test & getMemberById BigInt Fix (2026-02-12) ✅ COMPLETE
 

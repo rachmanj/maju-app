@@ -8,6 +8,7 @@ import type { ColumnsType } from "antd/es/table";
 
 interface User {
   id: number;
+  username?: string | null;
   email: string;
   name: string;
   phone?: string | null;
@@ -74,6 +75,12 @@ export function UsersTable() {
   };
 
   const columns: ColumnsType<User> = [
+    {
+      title: "Username",
+      dataIndex: "username",
+      key: "username",
+      render: (text) => text ? <span className="font-mono">{text}</span> : "-",
+    },
     {
       title: "Email",
       dataIndex: "email",

@@ -17,13 +17,13 @@ export default function LoginPage() {
 
     try {
       const result = await signIn("credentials", {
-        email: values.email,
+        email: values.email.trim(),
         password: values.password,
         redirect: false,
       });
 
       if (result?.error) {
-        message.error("Email atau password salah");
+        message.error("Email/username atau password salah");
       } else {
         message.success("Login berhasil");
         window.location.href = "/dashboard";
@@ -47,15 +47,12 @@ export default function LoginPage() {
         >
           <Form.Item
             name="email"
-            label="Email"
-            rules={[
-              { required: true, message: "Email harus diisi" },
-              { type: "email", message: "Format email tidak valid" },
-            ]}
+            label="Email atau Username"
+            rules={[{ required: true, message: "Email atau username harus diisi" }]}
           >
             <Input
               prefix={<UserOutlined />}
-              placeholder="nama@example.com"
+              placeholder="email@example.com atau username"
               disabled={isLoading}
             />
           </Form.Item>
