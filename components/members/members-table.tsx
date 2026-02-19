@@ -78,7 +78,7 @@ export function MembersTable() {
       title: "NIK",
       dataIndex: "nik",
       key: "nik",
-      render: (text) => <span className="font-mono">{text}</span>,
+      render: (text) => <span className="font-mono">{text || "-"}</span>,
     },
     {
       title: "Nama",

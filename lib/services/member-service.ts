@@ -6,7 +6,7 @@ import { AuditService } from './audit-service';
 export class MemberService {
   static async createMember(data: {
     member_number?: string;
-    nik: string;
+    nik?: string | null;
     name: string;
     email?: string;
     phone?: string;
@@ -21,7 +21,7 @@ export class MemberService {
       const m = await tx.members.create({
         data: {
           member_number: data.member_number?.trim() || null,
-          nik: data.nik,
+          nik: data.nik?.trim() || null,
           name: data.name,
           email: data.email ?? null,
           phone: data.phone ?? null,
@@ -62,7 +62,7 @@ export class MemberService {
       action: 'member.create',
       entity_type: 'member',
       entity_id: Number(member.id),
-      new_values: { nik: data.nik, name: data.name },
+      new_values: { nik: data.nik ?? null, name: data.name },
     });
     return Number(member.id);
   }
@@ -79,7 +79,7 @@ export class MemberService {
     return {
       id: Number(m.id),
       member_number: m.member_number ?? undefined,
-      nik: m.nik,
+      nik: m.nik ?? undefined,
       name: m.name,
       email: m.email ?? undefined,
       phone: m.phone ?? undefined,
@@ -136,7 +136,7 @@ export class MemberService {
     const list = members.map((m) => ({
       id: Number(m.id),
       member_number: m.member_number ?? undefined,
-      nik: m.nik,
+      nik: m.nik ?? undefined,
       name: m.name,
       email: m.email ?? undefined,
       phone: m.phone ?? undefined,
@@ -164,6 +164,7 @@ export class MemberService {
     const update: Record<string, unknown> = { ...data };
     delete update.id;
     delete update.created_at;
+    if ('nik' in update) update.nik = (update.nik as string)?.trim() || null;
     delete update.project_name;
     delete update.project_code;
     delete update.department_name;

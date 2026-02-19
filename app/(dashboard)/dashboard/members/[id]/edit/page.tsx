@@ -6,7 +6,7 @@ import { Form, Input, Button, Card, App, Spin, Select } from "antd";
 
 interface MemberFormData {
   member_number?: string;
-  nik: string;
+  nik?: string;
   name: string;
   email?: string;
   phone?: string;
@@ -73,7 +73,7 @@ export default function EditMemberPage() {
         const member: Member = await response.json();
         form.setFieldsValue({
           member_number: member.member_number || "",
-          nik: member.nik,
+          nik: member.nik ?? "",
           name: member.name,
           email: member.email || "",
           phone: member.phone || "",
@@ -103,6 +103,7 @@ export default function EditMemberPage() {
         body: JSON.stringify({
           ...values,
           member_number: values.member_number?.trim() || undefined,
+          nik: values.nik?.trim() || undefined,
           email: values.email || undefined,
           phone: values.phone || undefined,
           address: values.address || undefined,
@@ -153,12 +154,8 @@ export default function EditMemberPage() {
             <Form.Item
               label="NIK"
               name="nik"
-              rules={[
-                { required: true, message: "NIK harus diisi" },
-                { len: 16, message: "NIK harus 16 digit" },
-              ]}
             >
-              <Input placeholder="16 digit NIK" maxLength={16} />
+              <Input placeholder="Opsional, unik jika diisi" />
             </Form.Item>
 
             <Form.Item

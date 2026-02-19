@@ -128,7 +128,7 @@ model departments {
 model members {
   id            BigInt    @id @default(autoincrement())
   member_number String?   @unique @db.VarChar(50)
-  nik           String    @unique @db.VarChar(16)
+  nik           String?   @unique @db.VarChar(255)
   name          String    @db.VarChar(255)
   email         String?   @db.VarChar(255)
   phone         String?   @db.VarChar(20)

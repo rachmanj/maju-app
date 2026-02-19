@@ -67,7 +67,7 @@ export class MonitoringService {
     stats: {
       member_id: number;
       member_name: string;
-      nik: string;
+      nik: string | null;
       last_login: string | null;
       savings_count: number;
       loan_payments_count: number;

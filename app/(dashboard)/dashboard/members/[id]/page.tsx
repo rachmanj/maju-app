@@ -93,7 +93,7 @@ export default function MemberDetailPage() {
           <div>
             <h1 className="text-3xl font-bold">{member.name}</h1>
             <p className="text-muted-foreground">
-              Detail anggota • NIK {member.nik}
+              Detail anggota{member.nik ? ` • NIK ${member.nik}` : ""}
             </p>
           </div>
         </div>
@@ -118,7 +118,7 @@ export default function MemberDetailPage() {
             <span className="font-mono">{member.member_number || "-"}</span>
           </Descriptions.Item>
           <Descriptions.Item label="NIK">
-            <span className="font-mono">{member.nik}</span>
+            <span className="font-mono">{member.nik || "-"}</span>
           </Descriptions.Item>
           <Descriptions.Item label="Nama Lengkap">{member.name}</Descriptions.Item>
           <Descriptions.Item label="Email">{member.email || "-"}</Descriptions.Item>

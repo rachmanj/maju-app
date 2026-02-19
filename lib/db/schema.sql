@@ -108,7 +108,7 @@ CREATE TABLE IF NOT EXISTS projects (
 -- Members table
 CREATE TABLE IF NOT EXISTS members (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    nik VARCHAR(16) UNIQUE NOT NULL,
+    nik VARCHAR(255) NULL UNIQUE,
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255),
     phone VARCHAR(20),
@@ -129,6 +129,8 @@ CREATE TABLE IF NOT EXISTS members (
     INDEX idx_status (status),
     INDEX idx_deleted_at (deleted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+ALTER TABLE members MODIFY COLUMN nik VARCHAR(255) NULL UNIQUE;
 
 -- Member Documents
 CREATE TABLE IF NOT EXISTS member_documents (
