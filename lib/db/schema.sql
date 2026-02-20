@@ -108,6 +108,7 @@ CREATE TABLE IF NOT EXISTS projects (
 -- Members table
 CREATE TABLE IF NOT EXISTS members (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    member_number VARCHAR(50) NOT NULL UNIQUE,
     nik VARCHAR(255) NULL UNIQUE,
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255),
@@ -131,6 +132,11 @@ CREATE TABLE IF NOT EXISTS members (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 ALTER TABLE members MODIFY COLUMN nik VARCHAR(255) NULL UNIQUE;
+ALTER TABLE members ADD COLUMN member_number VARCHAR(50) NULL UNIQUE;
+UPDATE members SET member_number = CONCAT('MBR', LPAD(id, 8, '0')) WHERE member_number IS NULL OR member_number = '';
+ALTER TABLE members MODIFY COLUMN member_number VARCHAR(50) NOT NULL UNIQUE;
+ALTER TABLE users ADD COLUMN member_id BIGINT NULL UNIQUE;
+ALTER TABLE users ADD CONSTRAINT fk_users_member FOREIGN KEY (member_id) REFERENCES members(id);
 
 -- Member Documents
 CREATE TABLE IF NOT EXISTS member_documents (

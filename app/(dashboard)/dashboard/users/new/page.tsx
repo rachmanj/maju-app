@@ -12,6 +12,13 @@ interface Role {
   name: string;
 }
 
+interface MemberOption {
+  id: number;
+  member_number: string;
+  name: string;
+  email?: string;
+}
+
 export default function NewUserPage() {
   const router = useRouter();
   const { data: session, status } = useSession();
@@ -20,6 +27,8 @@ export default function NewUserPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [roles, setRoles] = useState<Role[]>([]);
   const [rolesLoading, setRolesLoading] = useState(true);
+  const [members, setMembers] = useState<MemberOption[]>([]);
+  const [membersLoading, setMembersLoading] = useState(false);
 
   useEffect(() => {
     if (status === "authenticated" && session) {
@@ -48,6 +57,19 @@ export default function NewUserPage() {
     fetchRoles();
   }, []);
 
+  const fetchMembers = async () => {
+    setMembersLoading(true);
+    try {
+      const res = await fetch("/api/members/for-user-assign");
+      if (res.ok) {
+        const data = await res.json();
+        setMembers(data);
+      }
+    } finally {
+      setMembersLoading(false);
+    }
+  };
+
   const onSubmit = async (values: {
     username?: string;
     email: string;
@@ -56,6 +78,7 @@ export default function NewUserPage() {
     phone?: string;
     is_active: boolean;
     role_ids: number[];
+    member_id?: number;
   }) => {
     setIsLoading(true);
     try {
@@ -68,6 +91,7 @@ export default function NewUserPage() {
           phone: values.phone || undefined,
           is_active: values.is_active ?? true,
           role_ids: values.role_ids,
+          member_id: values.member_id,
         }),
       });
 
@@ -166,7 +190,43 @@ export default function NewUserPage() {
               placeholder="Pilih role"
               loading={rolesLoading}
               options={roles.map((r) => ({ label: `${r.name} (${r.code})`, value: r.id }))}
+              onChange={(ids) => {
+                const anggotaRole = roles.find((r) => r.code === "anggota");
+                const hasAnggota = anggotaRole && ids?.includes(anggotaRole.id);
+                form.setFieldValue("member_id", undefined);
+                if (hasAnggota) fetchMembers();
+              }}
             />
+          </Form.Item>
+
+          <Form.Item
+            noStyle
+            shouldUpdate={(prev, curr) =>
+              prev.role_ids !== curr.role_ids
+            }
+          >
+            {({ getFieldValue }) => {
+              const roleIds = getFieldValue("role_ids") ?? [];
+              const anggotaRole = roles.find((r) => r.code === "anggota");
+              const hasAnggota = anggotaRole && roleIds.includes(anggotaRole.id);
+              if (!hasAnggota) return null;
+              return (
+                <Form.Item
+                  label="Member (Anggota)"
+                  name="member_id"
+                  rules={[{ required: true, message: "Pilih member untuk role Anggota" }]}
+                >
+                  <Select
+                    placeholder="Pilih member"
+                    loading={membersLoading}
+                    options={members.map((m) => ({
+                      label: `${m.member_number} - ${m.name}`,
+                      value: m.id,
+                    }))}
+                  />
+                </Form.Item>
+              );
+            }}
           </Form.Item>
 
           <Form.Item name="is_active" valuePropName="checked" initialValue={true}>

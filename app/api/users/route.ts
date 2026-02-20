@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { username, email, password, name, phone, is_active, role_ids } = body;
+    const { username, email, password, name, phone, is_active, role_ids, member_id } = body;
 
     if (!email || !password || !name) {
       return NextResponse.json(
@@ -58,6 +58,7 @@ export async function POST(request: NextRequest) {
         phone,
         is_active: is_active ?? true,
         role_ids: role_ids.map((r: number) => Number(r)),
+        member_id: member_id != null ? parseInt(member_id) : undefined,
       },
       parseInt(session.user.id)
     );

@@ -103,6 +103,7 @@ export class JournalService {
     referenceNumber?: string;
     description?: string;
     createdBy?: number;
+    entryDate?: Date;
   }): Promise<number> {
     const kasId = await this.getAccountIdByCode(ACCOUNT_CODES.KAS);
     let liabilityId: number | null = null;
@@ -127,8 +128,9 @@ export class JournalService {
           { account_id: kasId, debit: 0, credit: params.amount, description: params.description },
         ];
 
+    const entryDate = params.entryDate ?? new Date();
     return this.createManualEntry({
-      entry_date: new Date().toISOString().split('T')[0],
+      entry_date: entryDate.toISOString().split('T')[0],
       description: `${params.isDeposit ? 'Setor' : 'Tarik'} Simpanan ${params.savingsTypeCode} - ${params.referenceNumber || ''}`.trim(),
       lines,
       created_by: params.createdBy,

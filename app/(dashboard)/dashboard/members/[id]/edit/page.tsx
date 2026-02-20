@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { Form, Input, Button, Card, App, Spin, Select } from "antd";
 
 interface MemberFormData {
-  member_number?: string;
+  member_number: string;
   nik?: string;
   name: string;
   email?: string;
@@ -102,7 +102,7 @@ export default function EditMemberPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...values,
-          member_number: values.member_number?.trim() || undefined,
+          member_number: values.member_number?.trim(),
           nik: values.nik?.trim() || undefined,
           email: values.email || undefined,
           phone: values.phone || undefined,
@@ -148,8 +148,12 @@ export default function EditMemberPage() {
           ) : (
           <>
           <div className="grid gap-4 md:grid-cols-2">
-            <Form.Item label="Nomor Anggota" name="member_number">
-              <Input placeholder="Opsional, unik" />
+            <Form.Item
+              label="Nomor Anggota"
+              name="member_number"
+              rules={[{ required: true, message: "Nomor anggota wajib diisi" }]}
+            >
+              <Input placeholder="Unik, wajib" />
             </Form.Item>
             <Form.Item
               label="NIK"

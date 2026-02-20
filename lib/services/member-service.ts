@@ -5,7 +5,7 @@ import { AuditService } from './audit-service';
 
 export class MemberService {
   static async createMember(data: {
-    member_number?: string;
+    member_number: string;
     nik?: string | null;
     name: string;
     email?: string;
@@ -20,7 +20,7 @@ export class MemberService {
     const member = await prisma.$transaction(async (tx) => {
       const m = await tx.members.create({
         data: {
-          member_number: data.member_number?.trim() || null,
+          member_number: data.member_number.trim(),
           nik: data.nik?.trim() || null,
           name: data.name,
           email: data.email ?? null,
@@ -78,7 +78,7 @@ export class MemberService {
     if (!m) return null;
     return {
       id: Number(m.id),
-      member_number: m.member_number ?? undefined,
+      member_number: m.member_number ?? '',
       nik: m.nik ?? undefined,
       name: m.name,
       email: m.email ?? undefined,
@@ -135,7 +135,7 @@ export class MemberService {
     ]);
     const list = members.map((m) => ({
       id: Number(m.id),
-      member_number: m.member_number ?? undefined,
+      member_number: m.member_number ?? '',
       nik: m.nik ?? undefined,
       name: m.name,
       email: m.email ?? undefined,
@@ -165,6 +165,7 @@ export class MemberService {
     delete update.id;
     delete update.created_at;
     if ('nik' in update) update.nik = (update.nik as string)?.trim() || null;
+    if ('member_number' in update) update.member_number = (update.member_number as string)?.trim();
     delete update.project_name;
     delete update.project_code;
     delete update.department_name;
@@ -203,30 +204,29 @@ export class MemberService {
           changed_by: BigInt(approvedBy),
         },
       });
-      const email = m?.email?.trim();
-      if (email) {
-        const role = await tx.roles.findUnique({ where: { code: 'anggota' }, select: { id: true } });
-        if (role) {
-          const existing = await tx.users.findFirst({
-            where: { email, deleted_at: null },
-            select: { id: true },
+      const email = m?.email?.trim() ?? `member-${id}@temp.local`;
+      const role = await tx.roles.findUnique({ where: { code: 'anggota' }, select: { id: true } });
+      if (role) {
+        const existing = await tx.users.findFirst({
+          where: { OR: [{ email }, { member_id: BigInt(id) }], deleted_at: null },
+          select: { id: true },
+        });
+        if (!existing) {
+          const defaultPassword = m?.nik ?? 'Member123';
+          const password_hash = await bcrypt.hash(defaultPassword, 10);
+          const newUser = await tx.users.create({
+            data: {
+              email,
+              name: m?.name ?? email,
+              password_hash,
+              is_active: true,
+              member_id: BigInt(id),
+              created_by: BigInt(approvedBy),
+            },
           });
-          if (!existing) {
-            const defaultPassword = m?.nik ?? 'Member123';
-            const password_hash = await bcrypt.hash(defaultPassword, 10);
-            const newUser = await tx.users.create({
-              data: {
-                email,
-                name: m?.name ?? email,
-                password_hash,
-                is_active: true,
-                created_by: BigInt(approvedBy),
-              },
-            });
-            await tx.user_roles.create({
-              data: { user_id: newUser.id, role_id: role.id },
-            });
-          }
+          await tx.user_roles.create({
+            data: { user_id: newUser.id, role_id: role.id },
+          });
         }
       }
     });

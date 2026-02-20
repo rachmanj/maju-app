@@ -68,7 +68,7 @@ export interface Project {
 
 export interface Member {
   id: number;
-  member_number?: string;
+  member_number: string;
   nik?: string;
   name: string;
   email?: string;

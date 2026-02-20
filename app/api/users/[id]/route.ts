@@ -39,7 +39,7 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const { username, email, password, name, phone, is_active, role_ids } = body;
+    const { username, email, password, name, phone, is_active, role_ids, member_id } = body;
 
     const updateData: Parameters<typeof UserService.updateUser>[1] = {};
     if (username !== undefined) updateData.username = username?.trim() || null;
@@ -49,6 +49,7 @@ export async function PATCH(
     if (phone !== undefined) updateData.phone = phone;
     if (is_active !== undefined) updateData.is_active = is_active;
     if (role_ids !== undefined) updateData.role_ids = Array.isArray(role_ids) ? role_ids.map((r: number) => Number(r)) : [];
+    if (member_id !== undefined) updateData.member_id = member_id != null ? parseInt(member_id) : null;
 
     await UserService.updateUser(parseInt(id), updateData, parseInt(session.user.id));
 

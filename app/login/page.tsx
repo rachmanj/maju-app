@@ -47,12 +47,12 @@ export default function LoginPage() {
         >
           <Form.Item
             name="email"
-            label="Email atau Username"
-            rules={[{ required: true, message: "Email atau username harus diisi" }]}
+            label="Email, Username, atau Nomor Anggota"
+            rules={[{ required: true, message: "Email, username, atau nomor anggota harus diisi" }]}
           >
             <Input
               prefix={<UserOutlined />}
-              placeholder="email@example.com atau username"
+              placeholder="email, username, atau nomor anggota"
               disabled={isLoading}
             />
           </Form.Item>

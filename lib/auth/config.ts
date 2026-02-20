@@ -8,7 +8,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     Credentials({
       name: 'Credentials',
       credentials: {
-        email: { label: 'Email atau Username', type: 'text' },
+        email: { label: 'Email, Username, atau Nomor Anggota', type: 'text' },
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
@@ -17,7 +17,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
 
         const identifier = String(credentials.email).trim();
-        const u = await prisma.users.findFirst({
+        let u = await prisma.users.findFirst({
           where: {
             OR: [
               { email: identifier },
@@ -28,8 +28,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           },
           include: {
             user_roles: { include: { role: { select: { code: true } } } },
+            member: { select: { id: true } },
           },
         });
+        if (!u) {
+          const memberByNumber = await prisma.members.findFirst({
+            where: { member_number: identifier, status: 'active', deleted_at: null },
+            select: { id: true },
+          });
+          if (memberByNumber) {
+            u = await prisma.users.findFirst({
+              where: { member_id: memberByNumber.id, deleted_at: null, is_active: true },
+              include: {
+                user_roles: { include: { role: { select: { code: true } } } },
+                member: { select: { id: true } },
+              },
+            }) as typeof u;
+          }
+        }
         if (!u) return null;
 
         const password = String(credentials.password ?? '');
@@ -43,7 +59,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         const roles = u.user_roles.map((ur: (typeof u.user_roles)[number]) => ur.role.code);
         let memberId: number | null = null;
-        if (roles.includes('anggota') && u.email) {
+        if (u.member_id != null) {
+          memberId = Number(u.member_id);
+        } else if (roles.includes('anggota') && u.email) {
           const member = await prisma.members.findFirst({
             where: { email: u.email, status: 'active', deleted_at: null },
             select: { id: true },

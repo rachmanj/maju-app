@@ -36,6 +36,10 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
+    const memberNumber = body.member_number?.trim();
+    if (!memberNumber) {
+      return NextResponse.json({ error: 'Nomor anggota wajib diisi' }, { status: 400 });
+    }
     const memberId = await MemberService.createMember({
       ...body,
       created_by: parseInt(session.user.id),

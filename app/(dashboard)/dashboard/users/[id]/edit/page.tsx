@@ -19,7 +19,15 @@ interface User {
   name: string;
   phone?: string | null;
   is_active: boolean | null;
-  user_roles: { role_id: number }[];
+  member_id?: number | null;
+  user_roles: { role_id: number; role?: { code: string } }[];
+}
+
+interface MemberOption {
+  id: number;
+  member_number: string;
+  name: string;
+  email?: string;
 }
 
 export default function EditUserPage() {
@@ -32,6 +40,23 @@ export default function EditUserPage() {
   const [submitting, setSubmitting] = useState(false);
   const [roles, setRoles] = useState<Role[]>([]);
   const [rolesLoading, setRolesLoading] = useState(true);
+  const [members, setMembers] = useState<MemberOption[]>([]);
+  const [membersLoading, setMembersLoading] = useState(false);
+
+  const fetchMembers = async () => {
+    setMembersLoading(true);
+    try {
+      const id = params.id as string;
+      const url = id ? `/api/members/for-user-assign?editing_user_id=${id}` : "/api/members/for-user-assign";
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        setMembers(data);
+      }
+    } finally {
+      setMembersLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (status === "authenticated" && session) {
@@ -84,7 +109,10 @@ export default function EditUserPage() {
           phone: user.phone || "",
           is_active: user.is_active ?? true,
           role_ids: user.user_roles?.map((ur) => ur.role_id) ?? [],
+          member_id: user.member_id ?? undefined,
         });
+        const hasAnggota = user.user_roles?.some((ur) => ur.role?.code === "anggota");
+        if (hasAnggota) fetchMembers();
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : "Gagal memuat data pengguna";
         message.error(msg);
@@ -105,6 +133,7 @@ export default function EditUserPage() {
     phone?: string;
     is_active: boolean;
     role_ids: number[];
+    member_id?: number | null;
   }) => {
     const id = params.id as string;
     try {
@@ -116,6 +145,7 @@ export default function EditUserPage() {
         phone: values.phone || undefined,
         is_active: values.is_active,
         role_ids: values.role_ids,
+        member_id: values.member_id ?? null,
       };
       if (values.password) body.password = values.password;
 
@@ -225,7 +255,42 @@ export default function EditUserPage() {
                     label: `${r.name} (${r.code})`,
                     value: r.id,
                   }))}
+                  onChange={() => {
+                    const ids = form.getFieldValue("role_ids");
+                    const anggotaRole = roles.find((r) => r.code === "anggota");
+                    const hasAnggota = anggotaRole && ids?.includes(anggotaRole.id);
+                    if (hasAnggota) fetchMembers();
+                    else form.setFieldValue("member_id", undefined);
+                  }}
                 />
+              </Form.Item>
+
+              <Form.Item
+                noStyle
+                shouldUpdate={(prev, curr) => prev.role_ids !== curr.role_ids}
+              >
+                {({ getFieldValue }) => {
+                  const roleIds = getFieldValue("role_ids") ?? [];
+                  const anggotaRole = roles.find((r) => r.code === "anggota");
+                  const hasAnggota = anggotaRole && roleIds.includes(anggotaRole.id);
+                  if (!hasAnggota) return null;
+                  return (
+                    <Form.Item
+                      label="Member (Anggota)"
+                      name="member_id"
+                      rules={[{ required: true, message: "Pilih member untuk role Anggota" }]}
+                    >
+                      <Select
+                        placeholder="Pilih member"
+                        loading={membersLoading}
+                        options={members.map((m) => ({
+                          label: `${m.member_number} - ${m.name}`,
+                          value: m.id,
+                        }))}
+                      />
+                    </Form.Item>
+                  );
+                }}
               </Form.Item>
 
               <Form.Item name="is_active" valuePropName="checked">

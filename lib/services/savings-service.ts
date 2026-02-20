@@ -96,8 +96,10 @@ export class SavingsService {
     amount: number,
     referenceNumber?: string,
     notes?: string,
-    createdBy?: number
+    createdBy?: number,
+    transactionDate?: Date
   ): Promise<void> {
+    const txDate = transactionDate ?? new Date();
     await prisma.$transaction(async (tx) => {
       const acc = await tx.savings_accounts.findUniqueOrThrow({
         where: { id: accountId },
@@ -116,7 +118,7 @@ export class SavingsService {
           amount,
           balance_before: currentBalance,
           balance_after: newBalance,
-          transaction_date: new Date(),
+          transaction_date: txDate,
           reference_number: referenceNumber ?? null,
           notes: notes ?? null,
           created_by: createdBy != null ? BigInt(createdBy) : null,

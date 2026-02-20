@@ -16,6 +16,7 @@ export interface UserListItem {
 
 export interface UserDetail extends UserListItem {
   user_roles: { role_id: number; role: { id: number; code: string; name: string } }[];
+  member_id?: number | null;
 }
 
 export class UserService {
@@ -87,6 +88,7 @@ export class UserService {
       email: u.email,
       name: u.name,
       phone: u.phone,
+      member_id: u.member_id != null ? Number(u.member_id) : null,
       is_active: u.is_active,
       last_login_at: u.last_login_at,
       created_at: u.created_at,
@@ -95,7 +97,7 @@ export class UserService {
         role_id: ur.role_id,
         role: ur.role,
       })),
-    } as UserDetail;
+    } as unknown as UserDetail;
   }
 
   static async createUser(
@@ -107,6 +109,7 @@ export class UserService {
       phone?: string;
       is_active?: boolean;
       role_ids: number[];
+      member_id?: number;
     },
     createdBy?: number
   ): Promise<number> {
@@ -124,6 +127,19 @@ export class UserService {
 
     const passwordHash = await bcrypt.hash(data.password, 10);
 
+    const roleIds = data.role_ids;
+    const anggotaRole = await prisma.roles.findUnique({ where: { code: 'anggota' }, select: { id: true } });
+    const hasAnggotaRole = anggotaRole && roleIds.includes(anggotaRole.id);
+    if (hasAnggotaRole && !data.member_id) {
+      throw new Error('Anggota harus memilih member');
+    }
+    if (data.member_id) {
+      const existing = await prisma.users.findFirst({
+        where: { member_id: BigInt(data.member_id), deleted_at: null },
+      });
+      if (existing) throw new Error('Member sudah ditetapkan ke pengguna lain');
+    }
+
     const user = await prisma.$transaction(async (tx) => {
       const u = await tx.users.create({
         data: {
@@ -132,6 +148,7 @@ export class UserService {
           password_hash: passwordHash,
           name: data.name,
           phone: data.phone ?? null,
+          member_id: data.member_id != null ? BigInt(data.member_id) : null,
           is_active: data.is_active ?? true,
           created_by: createdBy ?? null,
         },
@@ -164,6 +181,7 @@ export class UserService {
       phone?: string;
       is_active?: boolean;
       role_ids?: number[];
+      member_id?: number | null;
     },
     updatedBy?: number
   ): Promise<void> {
@@ -189,6 +207,22 @@ export class UserService {
       }
     }
 
+    const roleIds = data.role_ids ?? existing.user_roles.map((ur) => ur.role_id);
+    const anggotaRole = await prisma.roles.findUnique({ where: { code: 'anggota' }, select: { id: true } });
+    const hasAnggotaRole = anggotaRole && roleIds.includes(anggotaRole.id);
+    if (hasAnggotaRole && data.member_id == null) {
+      const existingMemberId = existing.member_id;
+      if (existingMemberId == null) throw new Error('Anggota harus memilih member');
+    }
+    if (data.member_id != null) {
+      const existingWithMember = await prisma.users.findFirst({
+        where: { member_id: BigInt(data.member_id), deleted_at: null },
+      });
+      if (existingWithMember && Number(existingWithMember.id) !== id) {
+        throw new Error('Member sudah ditetapkan ke pengguna lain');
+      }
+    }
+
     await prisma.$transaction(async (tx) => {
       const updateData: Record<string, unknown> = {
         name: data.name ?? existing.name,
@@ -198,6 +232,7 @@ export class UserService {
       };
       if (data.username !== undefined) updateData.username = data.username || null;
       if (data.email) updateData.email = data.email;
+      if (data.member_id !== undefined) updateData.member_id = data.member_id != null ? BigInt(data.member_id) : null;
       if (data.password) {
         updateData.password_hash = await bcrypt.hash(data.password, 10);
       }

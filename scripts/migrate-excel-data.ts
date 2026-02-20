@@ -38,6 +38,8 @@ const prisma = new PrismaClient({
 interface MemberRow {
   NIK?: string;
   Nama?: string;
+  NomorAnggota?: string;
+  Nomor?: string;
   Email?: string;
   Telepon?: string;
   Alamat?: string;
@@ -62,7 +64,9 @@ async function importMembers(rows: MemberRow[], dryRun: boolean): Promise<{ crea
     console.error('Savings type POKOK not found. Run seed first.');
     return { created: 0, skipped: 0 };
   }
+  let rowIndex = 0;
   for (const row of rows) {
+    rowIndex++;
     const nik = String(row.NIK ?? '').trim();
     const name = String(row.Nama ?? '').trim();
     const email = (row.Email && String(row.Email).trim()) || null;
@@ -87,11 +91,13 @@ async function importMembers(rows: MemberRow[], dryRun: boolean): Promise<{ crea
       created++;
       continue;
     }
+    const memberNumber = String(row.NomorAnggota ?? row.Nomor ?? '').trim() || `MBR${Date.now()}-${String(rowIndex).padStart(4, '0')}`;
     await prisma.$transaction(async (tx) => {
       const m = await tx.members.create({
         data: {
-          nik,
-          name: name || nik,
+          member_number: memberNumber,
+          nik: nik || null,
+          name: name || nik || memberNumber,
           email,
           phone,
           address,
