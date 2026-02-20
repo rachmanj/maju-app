@@ -134,7 +134,10 @@ export async function POST(request: NextRequest) {
       }
 
       const member = await prisma.members.findFirst({
-        where: { nik, deleted_at: null },
+        where: {
+          deleted_at: null,
+          OR: [{ nik: nik }, { member_number: nik }],
+        },
         select: { id: true },
       });
       if (!member) {

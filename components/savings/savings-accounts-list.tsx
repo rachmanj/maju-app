@@ -307,7 +307,7 @@ export function SavingsAccountsList() {
         confirmLoading={submitting}
         okText={modalMode === "deposit" ? "Setor" : "Tarik"}
         width={480}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={form} layout="vertical" className="mt-4">
           <Form.Item

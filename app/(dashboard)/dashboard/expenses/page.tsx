@@ -216,7 +216,7 @@ export default function ExpensesPage() {
         open={modalOpen}
         onCancel={() => setModalOpen(false)}
         footer={null}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={form} layout="vertical" onFinish={onFinish}>
           <Form.Item name="category_id" label="Kategori" rules={[{ required: true }]}>
@@ -259,7 +259,7 @@ export default function ExpensesPage() {
           setEditingCategory(null);
         }}
         footer={null}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={categoryForm} layout="vertical" onFinish={onCategoryEditFinish}>
           <Form.Item
