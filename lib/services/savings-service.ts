@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db/prisma';
 import type { SavingsAccount, SavingsTransaction, SavingsType } from '@/types/database';
+import { generateAccountNumber } from '@/lib/utils/savings-account-number';
 import { AuditService } from './audit-service';
 
 function toAccount(rows: { id: bigint; member_id: bigint; savings_type_id: number; account_number: string | null; balance: unknown; opened_date: Date; closed_date: Date | null; created_at: Date | null; updated_at: Date | null } & { savings_type?: { code: string; name: string } }): SavingsAccount {
@@ -54,11 +55,16 @@ export class SavingsService {
   static async createSavingsAccount(
     memberId: number,
     savingsTypeId: number,
-    initialAmount: number = 0
+    initialAmount: number = 0,
+    typeCode?: string
   ): Promise<number> {
     const account = await prisma.$transaction(async (tx) => {
-      const count = await tx.savings_accounts.count({ where: { savings_type_id: savingsTypeId } });
-      const accountNumber = `SAV${savingsTypeId}${(count + 1).toString().padStart(8, '0')}`;
+      const type = await tx.savings_types.findUnique({ where: { id: savingsTypeId }, select: { code: true } });
+      const code = typeCode ?? type?.code ?? 'POKOK';
+      const count = await tx.savings_accounts.count({
+        where: { member_id: memberId, savings_type_id: savingsTypeId },
+      });
+      const accountNumber = generateAccountNumber(memberId, code, count + 1);
       const acc = await tx.savings_accounts.create({
         data: {
           member_id: memberId,
@@ -97,7 +103,8 @@ export class SavingsService {
     referenceNumber?: string,
     notes?: string,
     createdBy?: number,
-    transactionDate?: Date
+    transactionDate?: Date,
+    uploadBatchId?: number
   ): Promise<void> {
     const txDate = transactionDate ?? new Date();
     await prisma.$transaction(async (tx) => {
@@ -122,6 +129,7 @@ export class SavingsService {
           reference_number: referenceNumber ?? null,
           notes: notes ?? null,
           created_by: createdBy != null ? BigInt(createdBy) : null,
+          upload_batch_id: uploadBatchId != null ? BigInt(uploadBatchId) : null,
         },
       });
     });

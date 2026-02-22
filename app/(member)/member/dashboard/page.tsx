@@ -1,10 +1,27 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Card, Spin } from "antd";
-import { WalletOutlined, CreditCardOutlined, TransactionOutlined } from "@ant-design/icons";
+import { Card, Spin, Descriptions } from "antd";
+import { WalletOutlined, CreditCardOutlined, TransactionOutlined, UserOutlined } from "@ant-design/icons";
+
+interface MemberInfo {
+  member_number: string;
+  nik: string | null;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  job_title: string | null;
+  joined_date: string | null;
+  status: string | null;
+  project_name: string | null;
+  project_code: string | null;
+  department_name: string | null;
+  department_code: string | null;
+}
 
 interface DashboardData {
+  member: MemberInfo | null;
   totalSavings: number;
   savingsByType: { code: string; name: string; balance: number }[];
   totalOutstanding: number;
@@ -46,9 +63,61 @@ export default function MemberDashboardPage() {
   const formatRupiah = (n: number) =>
     new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
 
+  const getStatusLabel = (s: string | null) => {
+    const map: Record<string, string> = {
+      active: "Aktif",
+      pending: "Menunggu",
+      inactive: "Tidak Aktif",
+      resigned: "Keluar",
+    };
+    return (s && map[s]) || s || "-";
+  };
+
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <h1 className="text-xl font-semibold text-[hsl(var(--foreground))]">Dashboard</h1>
+
+      {data.member && (
+        <Card
+          title={
+            <span>
+              <UserOutlined className="mr-2" />
+              Data Anggota
+            </span>
+          }
+          className="shadow-sm"
+        >
+          <Descriptions column={{ xs: 1, sm: 2 }} size="small" bordered>
+            <Descriptions.Item label="Nomor Anggota">
+              <span className="font-mono">{data.member.member_number}</span>
+            </Descriptions.Item>
+            <Descriptions.Item label="NIK">{data.member.nik || "-"}</Descriptions.Item>
+            <Descriptions.Item label="Nama Lengkap">{data.member.name}</Descriptions.Item>
+            <Descriptions.Item label="Status">{getStatusLabel(data.member.status)}</Descriptions.Item>
+            <Descriptions.Item label="Email">{data.member.email || "-"}</Descriptions.Item>
+            <Descriptions.Item label="Telepon">{data.member.phone || "-"}</Descriptions.Item>
+            <Descriptions.Item label="Jabatan">{data.member.job_title || "-"}</Descriptions.Item>
+            <Descriptions.Item label="Tanggal Bergabung">
+              {data.member.joined_date
+                ? new Date(data.member.joined_date).toLocaleDateString("id-ID")
+                : "-"}
+            </Descriptions.Item>
+            <Descriptions.Item label="Proyek">
+              {data.member.project_name
+                ? [data.member.project_code, data.member.project_name].filter(Boolean).join(" - ")
+                : "-"}
+            </Descriptions.Item>
+            <Descriptions.Item label="Departemen">
+              {data.member.department_name
+                ? [data.member.department_code, data.member.department_name].filter(Boolean).join(" - ")
+                : "-"}
+            </Descriptions.Item>
+            <Descriptions.Item label="Alamat" span={2}>
+              {data.member.address || "-"}
+            </Descriptions.Item>
+          </Descriptions>
+        </Card>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Card className="shadow-sm">

@@ -35,6 +35,8 @@ export class JournalService {
     description?: string;
     lines: { account_id: number; debit: number; credit: number; description?: string }[];
     created_by?: number;
+    reference_type?: string;
+    reference_id?: number;
   }): Promise<number> {
     const totalDebit = data.lines.reduce((s, l) => s + (l.debit || 0), 0);
     const totalCredit = data.lines.reduce((s, l) => s + (l.credit || 0), 0);
@@ -54,6 +56,8 @@ export class JournalService {
           description: data.description ?? null,
           status: 'draft',
           created_by: data.created_by != null ? BigInt(data.created_by) : null,
+          reference_type: data.reference_type ?? null,
+          reference_id: data.reference_id != null ? BigInt(data.reference_id) : null,
         },
       });
       for (const line of data.lines) {
@@ -104,8 +108,14 @@ export class JournalService {
     description?: string;
     createdBy?: number;
     entryDate?: Date;
+    uploadBatchId?: number;
+    debitAccountId?: number;
   }): Promise<number> {
-    const kasId = await this.getAccountIdByCode(ACCOUNT_CODES.KAS);
+    const debitAccountId =
+      params.debitAccountId ?? (await this.getAccountIdByCode(ACCOUNT_CODES.KAS));
+    if (!debitAccountId) {
+      throw new Error('Debit account (Kas/Bank) not configured');
+    }
     let liabilityId: number | null = null;
     if (params.savingsTypeCode === 'POKOK') {
       liabilityId = await this.getAccountIdByCode(ACCOUNT_CODES.SIMPANAN_POKOK);
@@ -114,18 +124,18 @@ export class JournalService {
     } else if (params.savingsTypeCode === 'SUKARELA') {
       liabilityId = await this.getAccountIdByCode(ACCOUNT_CODES.SIMPANAN_SUKARELA);
     }
-    if (!kasId || !liabilityId) {
+    if (!debitAccountId || !liabilityId) {
       throw new Error('Chart of accounts not configured');
     }
 
     const lines = params.isDeposit
       ? [
-          { account_id: kasId, debit: params.amount, credit: 0, description: params.description },
+          { account_id: debitAccountId, debit: params.amount, credit: 0, description: params.description },
           { account_id: liabilityId, debit: 0, credit: params.amount, description: params.description },
         ]
       : [
           { account_id: liabilityId, debit: params.amount, credit: 0, description: params.description },
-          { account_id: kasId, debit: 0, credit: params.amount, description: params.description },
+          { account_id: debitAccountId, debit: 0, credit: params.amount, description: params.description },
         ];
 
     const entryDate = params.entryDate ?? new Date();
@@ -134,6 +144,8 @@ export class JournalService {
       description: `${params.isDeposit ? 'Setor' : 'Tarik'} Simpanan ${params.savingsTypeCode} - ${params.referenceNumber || ''}`.trim(),
       lines,
       created_by: params.createdBy,
+      reference_type: params.uploadBatchId != null ? 'savings_upload_batch' : undefined,
+      reference_id: params.uploadBatchId,
     });
   }
 

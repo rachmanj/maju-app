@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Card, Table, Spin } from "antd";
+import { useSearchParams, useRouter } from "next/navigation";
+import { Card, Table, Spin, Button } from "antd";
+import { ArrowLeftOutlined } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 
 interface TxRow {
@@ -11,15 +13,23 @@ interface TxRow {
   amount: number;
   date: string;
   balance_after?: number;
+  balance_before?: number;
   savings_type_name?: string;
+  notes?: string;
 }
 
 export default function MemberTransactionsPage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const accountId = searchParams.get("accountId");
   const [data, setData] = useState<{ transactions: TxRow[]; total: number }>({ transactions: [], total: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/member-portal/savings/transactions")
+    const url = accountId
+      ? `/api/member-portal/savings/transactions?accountId=${accountId}`
+      : "/api/member-portal/savings/transactions";
+    fetch(url)
       .then((r) => r.json())
       .then((d) => {
         if (d.error) throw new Error(d.error);
@@ -30,7 +40,7 @@ export default function MemberTransactionsPage() {
       })
       .catch(() => setData({ transactions: [], total: 0 }))
       .finally(() => setLoading(false));
-  }, []);
+  }, [accountId]);
 
   const formatRupiah = (n: number) =>
     new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
@@ -48,12 +58,16 @@ export default function MemberTransactionsPage() {
       key: "type",
       render: (t: string) => (t === "deposit" ? "Setoran" : t === "withdrawal" ? "Penarikan" : t),
     },
-    {
-      title: "Rekening",
-      dataIndex: "savings_type_name",
-      key: "savings_type_name",
-      render: (v: string) => v ?? "-",
-    },
+    ...(!accountId
+      ? [
+          {
+            title: "Rekening",
+            dataIndex: "savings_type_name",
+            key: "savings_type_name",
+            render: (v: string) => v ?? "-",
+          },
+        ]
+      : []),
     {
       title: "Jumlah",
       dataIndex: "amount",
@@ -83,7 +97,20 @@ export default function MemberTransactionsPage() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <h1 className="text-xl font-semibold text-[hsl(var(--foreground))]">Riwayat Transaksi</h1>
+      <div className="flex items-center gap-4">
+        {accountId && (
+          <Button
+            type="text"
+            icon={<ArrowLeftOutlined />}
+            onClick={() => router.push("/member/transactions")}
+          >
+            Semua Transaksi
+          </Button>
+        )}
+        <h1 className="text-xl font-semibold text-[hsl(var(--foreground))]">
+          {accountId ? "Transaksi Rekening" : "Riwayat Transaksi"}
+        </h1>
+      </div>
       <Card title="Transaksi Simpanan" className="shadow-sm">
         <Table
           rowKey="id"

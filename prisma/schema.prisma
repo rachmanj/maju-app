@@ -275,6 +275,18 @@ model savings_accounts {
   @@map("savings_accounts")
 }
 
+model savings_upload_batches {
+  id               BigInt   @id @default(autoincrement())
+  filename         String?  @db.VarChar(255)
+  transaction_count Int     @default(0)
+  success_count    Int     @default(0)
+  failed_count     Int     @default(0)
+  uploaded_at      DateTime @default(now()) @db.Timestamp(0)
+  uploaded_by      BigInt?
+  savings_transactions savings_transactions[]
+  @@map("savings_upload_batches")
+}
+
 model savings_transactions {
   id                 BigInt   @id @default(autoincrement())
   savings_account_id BigInt
@@ -287,10 +299,13 @@ model savings_transactions {
   notes              String?  @db.Text
   created_at         DateTime? @default(now()) @db.Timestamp(0)
   created_by         BigInt?
+  upload_batch_id    BigInt?
   savings_account    savings_accounts @relation(fields: [savings_account_id], references: [id], onDelete: Cascade)
+  upload_batch       savings_upload_batches? @relation(fields: [upload_batch_id], references: [id], onDelete: SetNull)
   @@index([savings_account_id])
   @@index([transaction_date])
   @@index([reference_number])
+  @@index([upload_batch_id])
   @@map("savings_transactions")
 }
 

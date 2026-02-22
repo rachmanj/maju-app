@@ -7,8 +7,8 @@ import { prisma } from '@/lib/db/prisma';
 import * as XLSX from 'xlsx';
 
 const COLUMN_ALIASES: Record<string, string[]> = {
-  nomor_anggota: ['nomor anggota', 'nik', 'no anggota', 'nomor anggota'],
-  jenis_simpanan: ['jenis simpanan', 'jenis', 'type', 'tipe'],
+  nomor_anggota: ['nomor anggota', 'nik', 'no anggota'],
+  jenis_simpanan: ['jenis simpanan', 'jenis', 'type'],
   tanggal_transaksi: ['tanggal transaksi', 'tanggal', 'date', 'tgl'],
   nominal: ['nominal', 'jumlah', 'amount', 'nilai'],
   keterangan: ['keterangan', 'notes', 'catatan'],
@@ -78,6 +78,8 @@ export async function POST(request: NextRequest) {
     if (!file || !(file instanceof File)) {
       return NextResponse.json({ error: 'File is required' }, { status: 400 });
     }
+    const debitAccountIdStr = formData.get('debit_account_id') as string | null;
+    const debitAccountId = debitAccountIdStr ? parseInt(debitAccountIdStr, 10) : undefined;
 
     const buf = Buffer.from(await file.arrayBuffer());
     const workbook = XLSX.read(buf, { type: 'buffer' });
@@ -102,6 +104,26 @@ export async function POST(request: NextRequest) {
 
     const savingsTypes = await prisma.savings_types.findMany();
     const typeByCode = Object.fromEntries(savingsTypes.map((t) => [t.code, t]));
+
+    let batchId: number | undefined;
+    let batch: { id: bigint } | null = null;
+    const batchesModel = (prisma as any).savings_upload_batches;
+    if (batchesModel) {
+      try {
+        batch = await batchesModel.create({
+          data: {
+            filename: file.name,
+            transaction_count: rows.length - 1,
+            success_count: 0,
+            failed_count: 0,
+            uploaded_by: session.user.id ? BigInt(session.user.id) : null,
+          },
+        });
+        batchId = batch ? Number(batch.id) : undefined;
+      } catch {
+        batchId = undefined;
+      }
+    }
 
     const results: { row: number; status: 'success' | 'error'; message?: string }[] = [];
     let successCount = 0;
@@ -132,6 +154,7 @@ export async function POST(request: NextRequest) {
         results.push({ row: rowNum, status: 'error', message: `Jenis simpanan tidak valid: ${jenisVal}` });
         continue;
       }
+      const typeId = typeByCode[typeCode].id;
 
       const member = await prisma.members.findFirst({
         where: {
@@ -145,11 +168,10 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      const typeId = typeByCode[typeCode].id;
       let account = await SavingsService.getSavingsAccount(Number(member.id), typeId);
       if (!account) {
         try {
-          const accountId = await SavingsService.createSavingsAccount(Number(member.id), typeId, 0);
+          const accountId = await SavingsService.createSavingsAccount(Number(member.id), typeId, 0, typeCode);
           account = await SavingsService.getSavingsAccount(Number(member.id), typeId);
         } catch (e) {
           results.push({ row: rowNum, status: 'error', message: `Gagal membuat rekening: ${(e as Error).message}` });
@@ -168,7 +190,8 @@ export async function POST(request: NextRequest) {
           referenceNumber,
           notes,
           parseInt(session.user.id),
-          transactionDate
+          transactionDate,
+          batchId
         );
 
         try {
@@ -180,6 +203,8 @@ export async function POST(request: NextRequest) {
             description: notes,
             createdBy: parseInt(session.user.id),
             entryDate: transactionDate,
+            uploadBatchId: batchId,
+            debitAccountId: debitAccountId && !isNaN(debitAccountId) ? debitAccountId : undefined,
           });
         } catch (je) {
           console.warn('Auto-journal failed for savings upload row', rowNum, je);
@@ -192,10 +217,22 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    if (batch && batchesModel) {
+      try {
+        await batchesModel.update({
+          where: { id: batch.id },
+          data: { success_count: successCount, failed_count: results.length - successCount },
+        });
+      } catch {
+        // ignore
+      }
+    }
+
     return NextResponse.json({
       message: `Import selesai: ${successCount} berhasil, ${results.length - successCount} gagal`,
       successCount,
       failedCount: results.length - successCount,
+      batchId,
       results,
     });
   } catch (error: unknown) {

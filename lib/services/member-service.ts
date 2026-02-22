@@ -42,13 +42,20 @@ export class MemberService {
       await tx.member_purchase_limits.create({
         data: { member_id: m.id, limit_amount: 0, effective_date: new Date() },
       });
-      const pokokType = await tx.savings_types.findUnique({ where: { code: 'POKOK' } });
-      if (pokokType) {
-        const accountNumber = `SAV${pokokType.id}${memberId.toString().padStart(8, '0')}`;
+      const savingsTypes = await tx.savings_types.findMany({
+        where: { code: { in: ['POKOK', 'WAJIB', 'SUKARELA'] } },
+        orderBy: { code: 'asc' },
+      });
+      for (const st of savingsTypes) {
+        const count = await tx.savings_accounts.count({
+          where: { member_id: m.id, savings_type_id: st.id },
+        });
+        const letter = st.code === 'POKOK' ? 'P' : st.code === 'WAJIB' ? 'W' : 'S';
+        const accountNumber = `SAV${letter}${memberId.toString().padStart(6, '0')}${(count + 1).toString().padStart(2, '0')}`;
         await tx.savings_accounts.create({
           data: {
             member_id: m.id,
-            savings_type_id: pokokType.id,
+            savings_type_id: st.id,
             account_number: accountNumber,
             balance: 0,
             opened_date: new Date(),

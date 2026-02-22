@@ -203,6 +203,8 @@ export interface LoanApplication {
 export interface Loan {
   id: number;
   member_id: number;
+  member_name?: string;
+  member_nik?: string;
   loan_application_id?: number;
   loan_number: string;
   principal_amount: number;

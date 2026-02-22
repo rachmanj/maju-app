@@ -11,7 +11,9 @@
     "migrate": "tsx scripts/run-migration.ts",
     "create-admin": "tsx scripts/create-admin.ts",
     "validate-migration": "tsx scripts/validate-migration.ts",
-    "migrate-excel": "tsx scripts/migrate-excel-data.ts"
+    "migrate-excel": "tsx scripts/migrate-excel-data.ts",
+    "ensure-savings-accounts": "tsx scripts/ensure-member-savings-accounts.ts",
+    "test": "vitest run"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -58,6 +60,7 @@
     "prisma": "^7.4.0",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.0.18"
   }
 }

@@ -1,5 +1,5 @@
 **Purpose**: AI's persistent knowledge base for project context and learnings
-**Last Updated**: 2026-02-18
+**Last Updated**: 2026-02-22
 
 ## Memory Maintenance Guidelines
 
@@ -26,6 +26,82 @@
 ---
 
 ## Project Memory Entries
+
+### [018] Pinjaman Module Test & Missing Routes (2026-02-22) ✅ COMPLETE
+
+**Challenge**: Test Pinjaman module via Chrome DevTools MCP; identify and resolve gaps.
+
+**Solution**:
+- Test: Login (pengurus), loans list, API 200; `/dashboard/loans/new` and `/dashboard/loans/[id]` returned 404
+- **Resolved**: Created `/dashboard/loans/new` (application form with member select, amount, tenor, purpose); `/dashboard/loans/[id]` (loan detail, schedules table, Catat Pembayaran modal)
+- APIs: `GET /api/loans/[id]` (loan + schedules), `POST /api/loans/[id]/payments` (record payment)
+
+**Key Learning**: Member select pattern from savings-accounts-list (fetchMembers, onSearch, status=active). Payment form: payment_amount, principal_amount, interest_amount, payment_date, payment_method.
+
+**Files**: app/(dashboard)/dashboard/loans/new/page.tsx, app/(dashboard)/dashboard/loans/[id]/page.tsx, app/api/loans/[id]/route.ts, app/api/loans/[id]/payments/route.ts, docs/pinjaman-module-test-report.md
+
+---
+
+### [017] Vitest Testing & Single .env (2026-02-22) ✅ COMPLETE
+
+**Challenge**: Add tests for Simpanan improvements; simplify env to single .env file.
+
+**Solution**:
+- **Vitest**: Added vitest, vitest.config.ts; unit tests for `generateAccountNumber` (SAV{letter}{member_id_6}{urutan_2}) and `getDatabaseConfig` (DATABASE_URL parsing, DB_* fallback)
+- **Extracted modules**: `lib/utils/savings-account-number.ts`, `lib/db/get-database-config.ts` for testability
+- **Single .env**: Scripts load only `.env`; removed .env.local; .gitignore allows .env.example
+- **Bug fixes**: upload route batch null check; journal-service kasId→debitAccountId
+
+**Key Learning**: Extract pure logic to separate modules for unit testing; getDatabaseConfig config object bypasses mariadb URL parsing issues.
+
+**Files**: `vitest.config.ts`, `lib/utils/savings-account-number.ts`, `lib/db/get-database-config.ts`, `lib/utils/__tests__/*`, `lib/db/__tests__/*`, `scripts/*`, `.gitignore`, `package.json` (test script)
+
+---
+
+### [016] Scripts: Prisma config object for DATABASE_URL (2026-02-21) ✅ COMPLETE
+
+**Challenge**: `ensure-savings-accounts` script failed with "Access denied (using password: NO)" and "error parsing connection string" despite correct credentials.
+
+**Solution**: Parse DATABASE_URL into config object (host, port, user, password, database) for PrismaMariaDb adapter; bypasses mariadb driver URL parsing. Fallback to DB_PASSWORD when URL has no password. Single .env used by all scripts.
+
+**Key Learning**: PrismaMariaDb accepts config object; mariadb driver URL parsing can fail with certain formats. lib/db/get-database-config.ts parses mysql:// URL via URL constructor.
+
+**Files**: `lib/db/get-database-config.ts`, `lib/db/prisma.ts`, `scripts/ensure-member-savings-accounts.ts`
+
+---
+
+### [015] Simpanan Account Format & Debit Selection (2026-02-21) ✅ COMPLETE
+
+**Challenge**: Standardize savings account numbers, auto-create 3 accounts per member, allow debit account selection on Excel upload.
+
+**Solution**:
+- **Account format**: `SAV{letter}{member_id_6}{urutan_2}` (e.g. SAVP00000401 for POKOK, member 4). Letter: P=POKOK, W=WAJIB, S=SUKARELA.
+- **Member creation**: Auto-create POKOK, WAJIB, SUKARELA accounts when member is approved (member-service.ts).
+- **Upload modal**: Debit account Select fetches COA accounts with code 10xx (Kas/Bank); passed to createSavingsJournal; default KAS (1010) if not set.
+- **Existing members**: Run `npm run ensure-savings-accounts` to create missing accounts.
+
+**Key Learning**: JournalService.createSavingsJournal accepts optional debitAccountId; COA cash/bank accounts use 10xx codes.
+
+**Files**: `lib/services/savings-service.ts`, `lib/services/member-service.ts`, `lib/services/journal-service.ts`, `app/api/savings/debit-accounts/route.ts`, `app/api/savings/upload/route.ts`, `components/savings/savings-upload-excel.tsx`, `scripts/ensure-member-savings-accounts.ts`, `docs/user/manual-simpanan.md`
+
+---
+
+### [014] Simpanan Batch Deletion (2026-02-21) ✅ COMPLETE
+
+**Challenge**: Allow deleting specific upload batches when Excel upload was mistaken, instead of only "delete all".
+
+**Solution**:
+- **savings_upload_batches** table: id, filename, transaction_count, success_count, failed_count, uploaded_at, uploaded_by
+- **savings_transactions.upload_batch_id**: nullable FK to batch; set when created via Excel upload
+- **journal_entries.reference_type/reference_id**: 'savings_upload_batch' + batch_id for upload-created journals
+- **APIs**: GET /api/savings/batches (list), DELETE /api/savings/batches/[id] (delete batch: reverse balances, delete journals, delete transactions, delete batch)
+- **UI**: Batch list in upload modal with "Hapus" per batch; "Hapus Semua Transaksi" remains for full clear
+
+**Key Learning**: Use reference_type/reference_id on journal_entries for batch linkage; recalc account balances by summing batch transaction amounts before delete.
+
+**Files**: `prisma/schema.prisma`, `lib/services/savings-service.ts`, `lib/services/journal-service.ts`, `app/api/savings/upload/route.ts`, `app/api/savings/batches/route.ts`, `app/api/savings/batches/[id]/route.ts`, `components/savings/savings-upload-excel.tsx`
+
+---
 
 ### [013] Audit Log & Monitoring Feature (2026-02-18) ✅ COMPLETE
 

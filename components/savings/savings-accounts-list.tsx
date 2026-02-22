@@ -377,7 +377,7 @@ export function SavingsAccountsList() {
                   min={1}
                   placeholder="0"
                   formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
-                  parser={(v: string | undefined) => parseInt((v ?? "").replace(/\D/g, ""), 10) || 0}
+                  parser={((v: string | undefined) => parseInt((v ?? "").replace(/\D/g, ""), 10) || 0) as any}
                 />
               </Form.Item>
               <Form.Item name="reference_number" label="No. Referensi">

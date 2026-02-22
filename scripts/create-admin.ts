@@ -2,8 +2,7 @@
 import dotenv from 'dotenv';
 import { resolve } from 'path';
 
-// Load environment variables from .env.local
-dotenv.config({ path: resolve(process.cwd(), '.env.local') });
+dotenv.config({ path: resolve(process.cwd(), '.env') });
 
 import db from '../lib/db';
 import bcrypt from 'bcryptjs';

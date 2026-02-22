@@ -2,7 +2,6 @@
 import dotenv from 'dotenv';
 import { resolve } from 'path';
 dotenv.config({ path: resolve(process.cwd(), '.env') });
-dotenv.config({ path: resolve(process.cwd(), '.env.local') });
 
 // Now import other modules that depend on environment variables
 import { runMigrations, seedInitialData } from '../lib/db/migrate';

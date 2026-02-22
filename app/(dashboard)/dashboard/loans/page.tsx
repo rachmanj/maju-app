@@ -3,6 +3,7 @@ import { Button, Card } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import Link from "next/link";
 import { LoansTable } from "@/components/loans/loans-table";
+import { LoanApplicationsTable } from "@/components/loans/loan-applications-table";
 
 export default function LoansPage() {
   return (
@@ -19,6 +20,12 @@ export default function LoansPage() {
         </Link>
       </div>
 
+      <Card title="Pengajuan Menunggu">
+        <Suspense fallback={<div>Loading...</div>}>
+          <LoanApplicationsTable />
+        </Suspense>
+      </Card>
+
       <Card title="Daftar Pinjaman">
         <Suspense fallback={<div>Loading...</div>}>
           <LoansTable />
@@ -27,3 +34,4 @@ export default function LoansPage() {
     </div>
   );
 }
+

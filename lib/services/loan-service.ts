@@ -97,8 +97,73 @@ export class LoanService {
       ...l,
       id: Number(l.id),
       member_name: l.member.name,
-      member_nik: l.member.nik,
+      member_nik: l.member.nik ?? '',
     } as unknown as Loan;
+  }
+
+  static async listApplications(params: {
+    page?: number;
+    limit?: number;
+    member_id?: number;
+    status?: string;
+  }): Promise<{ applications: Array<{
+    id: number;
+    application_number: string;
+    member_id: number;
+    member_name: string;
+    member_nik: string;
+    requested_amount: number;
+    requested_term_months: number;
+    purpose: string | null;
+    status: string | null;
+    applied_at: Date | null;
+  }>; total: number }> {
+    const page = params.page || 1;
+    const limit = params.limit || 20;
+    const skip = (page - 1) * limit;
+    const where: Record<string, unknown> = {};
+    if (params.member_id != null) where.member_id = params.member_id;
+    if (params.status) where.status = params.status;
+
+    const [rows, total] = await Promise.all([
+      prisma.loan_applications.findMany({
+        where,
+        include: { member: { select: { name: true, nik: true } } },
+        orderBy: { applied_at: 'desc' },
+        skip,
+        take: limit,
+      }),
+      prisma.loan_applications.count({ where }),
+    ]);
+    const applications = rows.map((a) => ({
+      id: Number(a.id),
+      application_number: a.application_number,
+      member_id: Number(a.member_id),
+      member_name: a.member.name,
+      member_nik: a.member.nik ?? '',
+      requested_amount: Number(a.requested_amount),
+      requested_term_months: a.requested_term_months,
+      purpose: a.purpose,
+      status: a.status,
+      applied_at: a.applied_at,
+    }));
+    return { applications, total };
+  }
+
+  static async getApplicationById(id: number) {
+    const app = await prisma.loan_applications.findUnique({
+      where: { id },
+      include: { member: { select: { name: true, nik: true } } },
+    });
+    if (!app) return null;
+    return {
+      ...app,
+      id: Number(app.id),
+      member_id: Number(app.member_id),
+      requested_amount: Number(app.requested_amount),
+      member_name: app.member.name,
+      member_nik: app.member.nik,
+    };
   }
 
   static async listLoans(params: {
@@ -125,8 +190,21 @@ export class LoanService {
       prisma.loans.count({ where }),
     ]);
     const list = loans.map((l) => ({
-      ...l,
       id: Number(l.id),
+      member_id: Number(l.member_id),
+      loan_application_id: l.loan_application_id != null ? Number(l.loan_application_id) : null,
+      loan_number: l.loan_number,
+      principal_amount: Number(l.principal_amount),
+      interest_rate: Number(l.interest_rate),
+      interest_method: l.interest_method,
+      term_months: l.term_months,
+      status: l.status,
+      approved_date: l.approved_date,
+      disbursed_date: l.disbursed_date,
+      completed_date: l.completed_date,
+      created_at: l.created_at,
+      updated_at: l.updated_at,
+      created_by: l.created_by != null ? Number(l.created_by) : null,
       member_name: l.member.name,
       member_nik: l.member.nik,
     }));

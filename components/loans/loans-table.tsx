@@ -50,6 +50,12 @@ export function LoansTable() {
     fetchLoans();
   }, [page]);
 
+  useEffect(() => {
+    const onRefresh = () => fetchLoans();
+    window.addEventListener("loans-refresh", onRefresh);
+    return () => window.removeEventListener("loans-refresh", onRefresh);
+  }, []);
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("id-ID", {
       style: "currency",

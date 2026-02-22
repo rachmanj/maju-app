@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Card, Table, Spin } from "antd";
+import { Card, Table, Spin, Button } from "antd";
+import { EyeOutlined } from "@ant-design/icons";
+import Link from "next/link";
 import type { ColumnsType } from "antd/es/table";
 
 interface SavingsAccount {
@@ -45,6 +47,18 @@ export default function MemberSavingsPage() {
       dataIndex: "opened_date",
       key: "opened_date",
       render: (v: string) => (v ? new Date(v).toLocaleDateString("id-ID") : "-"),
+    },
+    {
+      title: "Aksi",
+      key: "action",
+      width: 100,
+      render: (_, record) => (
+        <Link href={`/member/transactions?accountId=${record.id}`}>
+          <Button type="link" size="small" icon={<EyeOutlined />}>
+            Lihat Transaksi
+          </Button>
+        </Link>
+      ),
     },
   ];
 

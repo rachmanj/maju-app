@@ -13,7 +13,23 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const [accounts, recentTransactions] = await Promise.all([
+    const [member, accounts, recentTransactions] = await Promise.all([
+      prisma.members.findFirst({
+        where: { id: memberId, deleted_at: null },
+        select: {
+          member_number: true,
+          nik: true,
+          name: true,
+          email: true,
+          phone: true,
+          address: true,
+          job_title: true,
+          joined_date: true,
+          status: true,
+          project: { select: { name: true, code: true } },
+          department: { select: { name: true, code: true } },
+        },
+      }),
       SavingsService.getMemberSavingsAccounts(memberId),
       prisma.savings_transactions.findMany({
         where: {
@@ -47,7 +63,26 @@ export async function GET() {
       savings_type: (t.savings_account as any)?.savings_type?.name,
     }));
 
+    const memberInfo = member
+      ? {
+          member_number: member.member_number,
+          nik: member.nik ?? null,
+          name: member.name,
+          email: member.email ?? null,
+          phone: member.phone ?? null,
+          address: member.address ?? null,
+          job_title: member.job_title ?? null,
+          joined_date: member.joined_date,
+          status: member.status ?? null,
+          project_name: member.project?.name ?? null,
+          project_code: member.project?.code ?? null,
+          department_name: member.department?.name ?? null,
+          department_code: member.department?.code ?? null,
+        }
+      : null;
+
     return NextResponse.json({
+      member: memberInfo,
       totalSavings,
       savingsByType: accounts.map((a: SavingsAccount & { savings_type_code?: string; savings_type_name?: string }) => ({
         code: a.savings_type_code,
