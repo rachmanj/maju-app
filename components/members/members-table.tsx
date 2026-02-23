@@ -55,6 +55,12 @@ export function MembersTable() {
     fetchMembers();
   }, [page, search]);
 
+  useEffect(() => {
+    const onRefresh = () => fetchMembers();
+    window.addEventListener("members-refresh", onRefresh);
+    return () => window.removeEventListener("members-refresh", onRefresh);
+  }, []);
+
   const getStatusBadge = (status: string) => {
     const statusMap: Record<string, { text: string; status: "success" | "warning" | "error" | "default" }> = {
       active: { text: "Aktif", status: "success" },

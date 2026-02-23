@@ -28,7 +28,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           },
           include: {
             user_roles: { include: { role: { select: { code: true } } } },
-            member: { select: { id: true } },
+            member: { select: { id: true, name: true } },
           },
         });
         if (!u) {
@@ -41,7 +41,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               where: { member_id: memberByNumber.id, deleted_at: null, is_active: true },
               include: {
                 user_roles: { include: { role: { select: { code: true } } } },
-                member: { select: { id: true } },
+                member: { select: { id: true, name: true } },
               },
             }) as typeof u;
           }
@@ -68,10 +68,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           });
           if (member) memberId = Number(member.id);
         }
+        const displayName = u.member?.name ?? u.name;
         return {
           id: String(u.id),
           email: u.email,
-          name: u.name,
+          name: displayName,
           roles,
           memberId,
         };
@@ -82,6 +83,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
+        token.name = user.name ?? null;
+        token.email = user.email ?? null;
         token.roles = (user as any).roles || [];
         token.memberId = (user as any).memberId ?? null;
       }
@@ -90,6 +93,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string;
+        session.user.name = (token.name as string) ?? session.user.name ?? null;
+        session.user.email = (token.email as string) ?? session.user.email ?? null;
         session.user.roles = token.roles || [];
         session.user.memberId = token.memberId ?? null;
       }

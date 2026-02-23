@@ -9,9 +9,23 @@ import { ChangePasswordModal } from "@/components/auth/change-password-modal";
 import { UserOutlined, LogoutOutlined, LockOutlined } from "@ant-design/icons";
 import type { MenuProps } from "antd";
 
+const ROLE_NAMES: Record<string, string> = {
+  superadmin: "Superadmin",
+  manager: "Manager",
+  pengurus: "Pengurus",
+  kasir: "Kasir",
+  pengawas: "Pengawas",
+  anggota: "Anggota",
+};
+
 export function Header() {
   const { data: session } = useSession();
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
+
+  const roles = (session?.user as { roles?: string[] })?.roles ?? [];
+  const roleLabel = roles.length > 0
+    ? roles.map((r) => ROLE_NAMES[r] ?? r).join(", ")
+    : "";
 
   const menuItems: MenuProps["items"] = [
     {
@@ -60,12 +74,22 @@ export function Header() {
             <Dropdown menu={{ items: menuItems }} placement="bottomRight" trigger={["click"]}>
               <Button
                 type="text"
-                className="!flex !h-9 !w-9 !items-center !justify-center !rounded-full !border-0 !p-0 hover:!bg-teal-500/10"
+                className="!flex !h-9 !items-center !gap-2 !rounded-full !border-0 !px-2 !py-1 hover:!bg-teal-500/10"
               >
+                <div className="hidden text-right sm:block">
+                  <div className="truncate text-sm font-medium leading-tight text-[hsl(var(--foreground))]">
+                    {session.user.name}
+                  </div>
+                  {roleLabel && (
+                    <div className="truncate text-xs leading-tight text-[hsl(var(--muted-foreground))]">
+                      {roleLabel}
+                    </div>
+                  )}
+                </div>
                 <Avatar
                   icon={<UserOutlined />}
                   size="small"
-                  className="!bg-teal-500 !text-white"
+                  className="!bg-teal-500 !text-white shrink-0"
                 />
               </Button>
             </Dropdown>

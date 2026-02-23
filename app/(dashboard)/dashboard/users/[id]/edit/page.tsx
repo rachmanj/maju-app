@@ -27,7 +27,8 @@ interface MemberOption {
   id: number;
   member_number: string;
   name: string;
-  email?: string;
+  email?: string | null;
+  phone?: string | null;
 }
 
 export default function EditUserPage() {
@@ -43,7 +44,7 @@ export default function EditUserPage() {
   const [members, setMembers] = useState<MemberOption[]>([]);
   const [membersLoading, setMembersLoading] = useState(false);
 
-  const fetchMembers = async () => {
+  const fetchMembers = async (onLoaded?: (members: MemberOption[]) => void) => {
     setMembersLoading(true);
     try {
       const id = params.id as string;
@@ -52,9 +53,22 @@ export default function EditUserPage() {
       if (res.ok) {
         const data = await res.json();
         setMembers(data);
+        onLoaded?.(data);
       }
     } finally {
       setMembersLoading(false);
+    }
+  };
+
+  const handleMemberSelect = (memberId: number | undefined) => {
+    if (!memberId) return;
+    const m = members.find((x) => x.id === memberId);
+    if (m) {
+      form.setFieldsValue({
+        name: m.name,
+        email: m.email || "",
+        phone: m.phone || "",
+      });
     }
   };
 
@@ -112,7 +126,20 @@ export default function EditUserPage() {
           member_id: user.member_id ?? undefined,
         });
         const hasAnggota = user.user_roles?.some((ur) => ur.role?.code === "anggota");
-        if (hasAnggota) fetchMembers();
+        if (hasAnggota) {
+          fetchMembers((membersData) => {
+            if (user.member_id) {
+              const m = membersData.find((x) => x.id === user.member_id);
+              if (m) {
+                form.setFieldsValue({
+                  name: m.name,
+                  email: m.email || "",
+                  phone: m.phone || "",
+                });
+              }
+            }
+          });
+        }
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : "Gagal memuat data pengguna";
         message.error(msg);
@@ -199,48 +226,77 @@ export default function EditUserPage() {
             </div>
           ) : (
             <>
-              <div className="grid gap-4 md:grid-cols-2">
-                <Form.Item
-                  label="Username"
-                  name="username"
-                  rules={[
-                    { max: 50, message: "Username maksimal 50 karakter" },
-                    { pattern: /^[a-zA-Z0-9_-]*$/, message: "Username hanya huruf, angka, underscore, atau strip" },
-                  ]}
-                >
-                  <Input placeholder="username (opsional, untuk login)" />
-                </Form.Item>
+              <Form.Item
+                noStyle
+                shouldUpdate={(prev, curr) => prev.role_ids !== curr.role_ids || prev.member_id !== curr.member_id}
+              >
+                {({ getFieldValue }) => {
+                  const roleIds = getFieldValue("role_ids") ?? [];
+                  const memberId = getFieldValue("member_id");
+                  const anggotaRole = roles.find((r) => r.code === "anggota");
+                  const hasAnggota = anggotaRole && roleIds.includes(anggotaRole.id);
+                  const memberLinked = hasAnggota && memberId;
+                  const selectedMember = memberLinked ? members.find((m) => m.id === memberId) : null;
+                  const emailFromMember = selectedMember?.email;
+                  const profileFieldsReadOnly = memberLinked && !!emailFromMember;
 
-                <Form.Item
-                  label="Email"
-                  name="email"
-                  rules={[
-                    { required: true, message: "Email wajib diisi" },
-                    { type: "email", message: "Format email tidak valid" },
-                  ]}
-                >
-                  <Input type="email" placeholder="nama@example.com" />
-                </Form.Item>
+                  return (
+                    <>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <Form.Item
+                          label="Username"
+                          name="username"
+                          rules={[
+                            { max: 50, message: "Username maksimal 50 karakter" },
+                            { pattern: /^[a-zA-Z0-9_-]*$/, message: "Username hanya huruf, angka, underscore, atau strip" },
+                          ]}
+                        >
+                          <Input placeholder="username (opsional, untuk login)" />
+                        </Form.Item>
 
-                <Form.Item
-                  label="Password (kosongkan jika tidak diubah)"
-                  name="password"
-                >
-                  <Input.Password placeholder="••••••••" />
-                </Form.Item>
+                        <Form.Item
+                          label="Email"
+                          name="email"
+                          rules={[
+                            { required: true, message: "Email wajib diisi" },
+                            { type: "email", message: "Format email tidak valid" },
+                          ]}
+                        >
+                          <Input
+                            type="email"
+                            placeholder="nama@example.com"
+                            disabled={profileFieldsReadOnly}
+                          />
+                        </Form.Item>
 
-                <Form.Item
-                  label="Nama Lengkap"
-                  name="name"
-                  rules={[{ required: true, message: "Nama wajib diisi" }]}
-                >
-                  <Input placeholder="Nama pengguna" />
-                </Form.Item>
+                        <Form.Item
+                          label="Password (kosongkan jika tidak diubah)"
+                          name="password"
+                        >
+                          <Input.Password placeholder="••••••••" />
+                        </Form.Item>
 
-                <Form.Item label="Telepon" name="phone">
-                  <Input placeholder="08xxxxxxxxxx" />
-                </Form.Item>
-              </div>
+                        <Form.Item
+                          label="Nama Lengkap"
+                          name="name"
+                          rules={[{ required: true, message: "Nama wajib diisi" }]}
+                        >
+                          <Input placeholder="Nama pengguna" disabled={!!memberLinked} />
+                        </Form.Item>
+
+                        <Form.Item label="Telepon" name="phone">
+                          <Input placeholder="08xxxxxxxxxx" disabled={!!memberLinked} />
+                        </Form.Item>
+                      </div>
+                      {memberLinked && (
+                        <p className="mb-4 text-sm text-muted-foreground">
+                          Data profil diambil dari anggota terpilih. Ubah di Modul Anggota jika perlu.
+                        </p>
+                      )}
+                    </>
+                  );
+                }}
+              </Form.Item>
 
               <Form.Item
                 label="Role"
@@ -287,6 +343,7 @@ export default function EditUserPage() {
                           label: `${m.member_number} - ${m.name}`,
                           value: m.id,
                         }))}
+                        onChange={handleMemberSelect}
                       />
                     </Form.Item>
                   );

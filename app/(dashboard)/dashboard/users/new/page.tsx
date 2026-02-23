@@ -16,7 +16,8 @@ interface MemberOption {
   id: number;
   member_number: string;
   name: string;
-  email?: string;
+  email?: string | null;
+  phone?: string | null;
 }
 
 export default function NewUserPage() {
@@ -67,6 +68,18 @@ export default function NewUserPage() {
       }
     } finally {
       setMembersLoading(false);
+    }
+  };
+
+  const handleMemberSelect = (memberId: number | undefined) => {
+    if (!memberId) return;
+    const m = members.find((x) => x.id === memberId);
+    if (m) {
+      form.setFieldsValue({
+        name: m.name,
+        email: m.email || "",
+        phone: m.phone || "",
+      });
     }
   };
 
@@ -133,52 +146,81 @@ export default function NewUserPage() {
           onFinish={onSubmit}
           className="space-y-4"
         >
-          <div className="grid gap-4 md:grid-cols-2">
-            <Form.Item
-              label="Username"
-              name="username"
-              rules={[
-                { max: 50, message: "Username maksimal 50 karakter" },
-                { pattern: /^[a-zA-Z0-9_-]+$/, message: "Username hanya huruf, angka, underscore, atau strip" },
-              ]}
-            >
-              <Input placeholder="username (opsional, untuk login)" />
-            </Form.Item>
+          <Form.Item
+            noStyle
+            shouldUpdate={(prev, curr) => prev.role_ids !== curr.role_ids || prev.member_id !== curr.member_id}
+          >
+            {({ getFieldValue }) => {
+              const roleIds = getFieldValue("role_ids") ?? [];
+              const memberId = getFieldValue("member_id");
+              const anggotaRole = roles.find((r) => r.code === "anggota");
+              const hasAnggota = anggotaRole && roleIds.includes(anggotaRole.id);
+              const memberLinked = hasAnggota && memberId;
+              const selectedMember = memberLinked ? members.find((m) => m.id === memberId) : null;
+              const emailFromMember = selectedMember?.email;
+              const profileFieldsReadOnly = memberLinked && !!emailFromMember;
 
-            <Form.Item
-              label="Email"
-              name="email"
-              rules={[
-                { required: true, message: "Email wajib diisi" },
-                { type: "email", message: "Format email tidak valid" },
-              ]}
-            >
-              <Input type="email" placeholder="nama@example.com" />
-            </Form.Item>
+              return (
+                <>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <Form.Item
+                      label="Username"
+                      name="username"
+                      rules={[
+                        { max: 50, message: "Username maksimal 50 karakter" },
+                        { pattern: /^[a-zA-Z0-9_-]+$/, message: "Username hanya huruf, angka, underscore, atau strip" },
+                      ]}
+                    >
+                      <Input placeholder="username (opsional, untuk login)" />
+                    </Form.Item>
 
-            <Form.Item
-              label="Password"
-              name="password"
-              rules={[
-                { required: true, message: "Password wajib diisi" },
-                { min: 6, message: "Password minimal 6 karakter" },
-              ]}
-            >
-              <Input.Password placeholder="••••••••" />
-            </Form.Item>
+                    <Form.Item
+                      label="Email"
+                      name="email"
+                      rules={[
+                        { required: true, message: "Email wajib diisi" },
+                        { type: "email", message: "Format email tidak valid" },
+                      ]}
+                    >
+                      <Input
+                        type="email"
+                        placeholder="nama@example.com"
+                        disabled={profileFieldsReadOnly}
+                      />
+                    </Form.Item>
 
-            <Form.Item
-              label="Nama Lengkap"
-              name="name"
-              rules={[{ required: true, message: "Nama wajib diisi" }]}
-            >
-              <Input placeholder="Nama pengguna" />
-            </Form.Item>
+                    <Form.Item
+                      label="Password"
+                      name="password"
+                      rules={[
+                        { required: true, message: "Password wajib diisi" },
+                        { min: 6, message: "Password minimal 6 karakter" },
+                      ]}
+                    >
+                      <Input.Password placeholder="••••••••" />
+                    </Form.Item>
 
-            <Form.Item label="Telepon" name="phone">
-              <Input placeholder="08xxxxxxxxxx" />
-            </Form.Item>
-          </div>
+                    <Form.Item
+                      label="Nama Lengkap"
+                      name="name"
+                      rules={[{ required: true, message: "Nama wajib diisi" }]}
+                    >
+                      <Input placeholder="Nama pengguna" disabled={!!memberLinked} />
+                    </Form.Item>
+
+                    <Form.Item label="Telepon" name="phone">
+                      <Input placeholder="08xxxxxxxxxx" disabled={!!memberLinked} />
+                    </Form.Item>
+                  </div>
+                  {memberLinked && (
+                    <p className="mb-4 text-sm text-muted-foreground">
+                      Data profil diambil dari anggota terpilih. Ubah di Modul Anggota jika perlu.
+                    </p>
+                  )}
+                </>
+              );
+            }}
+          </Form.Item>
 
           <Form.Item
             label="Role"
@@ -223,6 +265,7 @@ export default function NewUserPage() {
                       label: `${m.member_number} - ${m.name}`,
                       value: m.id,
                     }))}
+                    onChange={handleMemberSelect}
                   />
                 </Form.Item>
               );

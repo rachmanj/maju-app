@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
         deleted_at: null,
         id: { notIn: assignedMemberIds },
       },
-      select: { id: true, member_number: true, name: true, email: true },
+      select: { id: true, member_number: true, name: true, email: true, phone: true },
       orderBy: { member_number: 'asc' },
     });
 
@@ -35,7 +35,8 @@ export async function GET(request: NextRequest) {
         id: Number(m.id),
         member_number: m.member_number,
         name: m.name,
-        email: m.email,
+        email: m.email ?? null,
+        phone: m.phone ?? null,
       }))
     );
   } catch (error: unknown) {

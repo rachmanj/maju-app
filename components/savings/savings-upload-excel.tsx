@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useSession } from "next-auth/react";
 import { Button, Modal, Upload, App, Table, Select } from "antd";
 import { UploadOutlined, DownloadOutlined, DeleteOutlined } from "@ant-design/icons";
 import type { UploadProps } from "antd";
@@ -29,6 +30,9 @@ interface Batch {
 
 export function SavingsUploadExcel() {
   const { message } = App.useApp();
+  const { data: session } = useSession();
+  const roles = (session?.user as { roles?: string[] })?.roles ?? [];
+  const canClearAll = roles.includes("superadmin") || roles.includes("manager");
   const [modalOpen, setModalOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [clearing, setClearing] = useState(false);
@@ -256,14 +260,16 @@ export function SavingsUploadExcel() {
             >
               Unduh Template
             </Button>
-            <Button
-              danger
-              icon={<DeleteOutlined />}
-              onClick={handleClear}
-              loading={clearing}
-            >
-              Hapus Semua Transaksi
-            </Button>
+            {canClearAll && (
+              <Button
+                danger
+                icon={<DeleteOutlined />}
+                onClick={handleClear}
+                loading={clearing}
+              >
+                Hapus Semua Transaksi
+              </Button>
+            )}
           </div>
           <Upload.Dragger
             name="file"

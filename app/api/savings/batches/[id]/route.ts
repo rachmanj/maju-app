@@ -13,10 +13,12 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const id = parseInt((await params).id, 10);
-    if (isNaN(id)) {
+    const idParam = (await params).id;
+    const idNum = parseInt(idParam, 10);
+    if (isNaN(idNum)) {
       return NextResponse.json({ error: 'Invalid batch ID' }, { status: 400 });
     }
+    const id = BigInt(idNum);
 
     const batch = await prisma.savings_upload_batches.findUnique({
       where: { id },
@@ -28,7 +30,7 @@ export async function DELETE(
 
     const txIds = batch.savings_transactions.map((t) => t.id);
     const journalCount = await prisma.journal_entries.count({
-      where: { reference_type: 'savings_upload_batch', reference_id: BigInt(id) },
+      where: { reference_type: 'savings_upload_batch', reference_id: id },
     });
     const accountDeltas = new Map<bigint, number>();
     for (const t of batch.savings_transactions) {
@@ -54,7 +56,7 @@ export async function DELETE(
       await tx.journal_entries.deleteMany({
         where: {
           reference_type: 'savings_upload_batch',
-          reference_id: BigInt(id),
+          reference_id: id,
         },
       });
       await tx.savings_transactions.deleteMany({

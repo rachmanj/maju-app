@@ -1,5 +1,5 @@
 **Purpose**: AI's persistent knowledge base for project context and learnings
-**Last Updated**: 2026-02-22
+**Last Updated**: 2026-02-23
 
 ## Memory Maintenance Guidelines
 
@@ -26,6 +26,21 @@
 ---
 
 ## Project Memory Entries
+
+### [019] Navbar Display & Auth Session Accuracy (2026-02-23) ✅ COMPLETE
+
+**Challenge**: Ensure user name and role displayed in top-right navbar accurately reflect logged-in user; session.user.name could be missing or stale when JWT did not explicitly persist name/email.
+
+**Solution**:
+- **Header**: Display `session.user.name` and role(s) (ROLE_NAMES mapping) top-right; responsive (hidden on sm).
+- **Auth config**: Explicitly persist `token.name` and `token.email` in jwt callback; pass to `session.user` in session callback.
+- **Display name source**: For users with `member_id` (anggota), use `member.name` (source of truth per module review); for staff, use `users.name`. Auth authorize includes `member: { select: { id, name } }` and returns `displayName = u.member?.name ?? u.name`.
+
+**Key Learning**: Auth.js JWT callback must explicitly persist all session-needed fields; default merge may not reliably include name/email for credentials provider. Member as source of truth for anggota profile ensures consistency with member portal.
+
+**Files**: `components/layout/header.tsx`, `lib/auth/config.ts`
+
+---
 
 ### [018] Pinjaman Module Test & Missing Routes (2026-02-22) ✅ COMPLETE
 
@@ -187,12 +202,22 @@
 **Solution**:
 - UserService with list/create/update/delete (soft delete via deleted_at); bcrypt for passwords; role assignment via user_roles
 - API routes protected by ADMIN_USERS; DELETE blocks when target user id === current user id
-- Sidebar uses useMenuItems() with useSession + hasPermission to show "Pengguna" only for Superadmin/Manager
+- Sidebar uses useMenuItems() with useSession + hasPermission to show "Pengguna" for Superadmin, Manager, Pengurus
 - Page-level redirect when user lacks ADMIN_USERS; Chrome DevTools MCP test validated full CRUD and self-delete protection
 
 **Key Learning**: Permission-based sidebar visibility (`hasPermission(roles, PERMISSIONS.ADMIN_USERS)`) provides consistent UX—users see only menus they can access. Self-delete guard in API (not just UI) prevents accidental lockout even if client is bypassed.
 
 **Files**: `lib/services/user-service.ts`, `app/api/users/*`, `app/api/roles/route.ts`, `components/users/*`, `components/layout/sidebar.tsx`
+
+---
+
+### [007b] Pengurus Users Module Access (2026-02-11) ✅ COMPLETE
+
+**Challenge**: Allow pengurus role to manage users module (CRUD, role assignment).
+
+**Solution**: Added `PERMISSIONS.ADMIN_USERS` to `pengurus` in `ROLE_PERMISSIONS` (`lib/auth/permissions.ts`). All guards (sidebar, pages, API) use `hasPermission(roles, PERMISSIONS.ADMIN_USERS)`—no other changes needed.
+
+**Key Learning**: RBAC is centralized in permissions.ts; adding a permission to a role grants access everywhere that permission is checked.
 
 ---
 

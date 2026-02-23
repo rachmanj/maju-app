@@ -8,6 +8,7 @@ export interface UserListItem {
   email: string;
   name: string;
   phone: string | null;
+  member_number: string | null;
   is_active: boolean | null;
   last_login_at: Date | null;
   created_at: Date | null;
@@ -48,6 +49,7 @@ export class UserService {
           user_roles: {
             include: { role: { select: { code: true, name: true } } },
           },
+          member: { select: { member_number: true } },
         },
         orderBy: { created_at: 'desc' },
         skip,
@@ -62,6 +64,7 @@ export class UserService {
       email: u.email,
       name: u.name,
       phone: u.phone,
+      member_number: u.member?.member_number ?? null,
       is_active: u.is_active,
       last_login_at: u.last_login_at,
       created_at: u.created_at,

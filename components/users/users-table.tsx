@@ -12,6 +12,7 @@ interface User {
   email: string;
   name: string;
   phone?: string | null;
+  member_number?: string | null;
   is_active: boolean | null;
   last_login_at: string | null;
   created_at: string | null;
@@ -91,6 +92,12 @@ export function UsersTable() {
       title: "Nama",
       dataIndex: "name",
       key: "name",
+    },
+    {
+      title: "No Anggota",
+      dataIndex: "member_number",
+      key: "member_number",
+      render: (text: string | null | undefined) => text ? <span className="font-mono">{text}</span> : "-",
     },
     {
       title: "Telepon",
