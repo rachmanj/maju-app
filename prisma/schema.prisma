@@ -370,7 +370,7 @@ model loans {
   loan_number       String   @unique @db.VarChar(50)
   principal_amount  Decimal  @db.Decimal(15, 2)
   interest_rate     Decimal  @db.Decimal(5, 2)
-  interest_method   String?  @default("flat") @db.VarChar(50)
+  interest_method   String?  @default("flat_total") @db.VarChar(50)
   term_months       Int
   status            String?  @default("pending") @db.VarChar(50)
   approved_date     DateTime? @db.Date

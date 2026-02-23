@@ -28,27 +28,67 @@ export class LoanService {
   static async approveAndCreateLoan(
     applicationId: number,
     data: {
-      interest_rate: number;
+      interest_method: 'flat' | 'flat_total' | 'manual';
+      interest_rate?: number;
+      monthly_amount?: number;
       approved_by: number;
       disbursed_date?: Date;
     }
   ): Promise<number> {
     const loan = await prisma.$transaction(async (tx) => {
       const app = await tx.loan_applications.findUniqueOrThrow({ where: { id: applicationId } });
+      const principal = Number(app.requested_amount);
+      const term = app.requested_term_months;
+
       await tx.loan_applications.update({
         where: { id: applicationId },
         data: { status: 'approved', approved_at: new Date(), approved_by: BigInt(data.approved_by) },
       });
       const loanCount = await tx.loans.count();
       const loanNumber = `LOAN${new Date().getFullYear()}${(loanCount + 1).toString().padStart(6, '0')}`;
+
+      let schedules: { installmentNumber: number; dueDate: Date; installmentAmount: number; principalAmount: number; interestAmount: number }[];
+      let interestRate: number;
+      let interestMethod: string;
+
+      if (data.interest_method === 'manual' && data.monthly_amount != null) {
+        const calc = LoanCalculator.calculateManualAmount({
+          principalAmount: principal,
+          termMonths: term,
+          monthlyAmount: data.monthly_amount,
+        });
+        schedules = calc.schedules;
+        interestRate = calc.totalInterest > 0 ? (calc.totalInterest / principal) * 100 : 0;
+        interestMethod = 'manual';
+      } else if (data.interest_method === 'flat' && data.interest_rate != null) {
+        const calc = LoanCalculator.calculateFlatRate({
+          principalAmount: principal,
+          interestRate: data.interest_rate,
+          termMonths: term,
+        });
+        schedules = calc.schedules;
+        interestRate = data.interest_rate;
+        interestMethod = 'flat';
+      } else {
+        const rate = data.interest_rate ?? 0;
+        const calc = LoanCalculator.calculateFlatTotalRate({
+          principalAmount: principal,
+          interestRateTotal: rate,
+          termMonths: term,
+        });
+        schedules = calc.schedules;
+        interestRate = rate;
+        interestMethod = 'flat_total';
+      }
+
       const l = await tx.loans.create({
         data: {
           member_id: app.member_id,
           loan_application_id: applicationId,
           loan_number: loanNumber,
           principal_amount: app.requested_amount,
-          interest_rate: data.interest_rate,
-          interest_method: 'flat',
+          interest_rate: interestRate,
+          interest_method: interestMethod,
           term_months: app.requested_term_months,
           status: 'approved',
           approved_date: new Date(),
@@ -56,12 +96,7 @@ export class LoanService {
           created_by: BigInt(data.approved_by),
         },
       });
-      const calculation = LoanCalculator.calculateFlatRate({
-        principalAmount: Number(app.requested_amount),
-        interestRate: data.interest_rate,
-        termMonths: app.requested_term_months,
-      });
-      for (const schedule of calculation.schedules) {
+      for (const schedule of schedules) {
         await tx.loan_schedules.create({
           data: {
             loan_id: l.id,
@@ -72,6 +107,7 @@ export class LoanService {
             principal_amount: schedule.principalAmount,
             interest_amount: schedule.interestAmount,
             status: 'pending',
+            is_manual_amount: interestMethod === 'manual',
           },
         });
       }
@@ -90,7 +126,7 @@ export class LoanService {
   static async getLoanById(id: number): Promise<Loan | null> {
     const l = await prisma.loans.findUnique({
       where: { id },
-      include: { member: { select: { name: true, nik: true } } },
+      include: { member: { select: { name: true, nik: true, member_number: true } } },
     });
     if (!l) return null;
     return {
@@ -98,6 +134,7 @@ export class LoanService {
       id: Number(l.id),
       member_name: l.member.name,
       member_nik: l.member.nik ?? '',
+      member_number: l.member.member_number ?? null,
     } as unknown as Loan;
   }
 

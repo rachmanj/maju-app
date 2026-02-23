@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Button, Table, Badge, Modal, Form, InputNumber, App } from "antd";
+import { Button, Table, Modal, Form, InputNumber, App, Radio } from "antd";
 import { CheckOutlined } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 
@@ -49,7 +49,11 @@ export function LoanApplicationsTable() {
 
   const openApproveModal = (app: Application) => {
     setApprovingId(app.id);
-    form.setFieldsValue({ interest_rate: 12 });
+    form.setFieldsValue({
+      interest_method: "flat_total",
+      interest_rate: 12.6,
+      monthly_amount: undefined,
+    });
     setApproveModalOpen(true);
   };
 
@@ -58,10 +62,19 @@ export function LoanApplicationsTable() {
     const values = await form.validateFields();
     setSubmitting(true);
     try {
+      const body: Record<string, unknown> = {
+        interest_method: values.interest_method,
+        disbursed_date: undefined,
+      };
+      if (values.interest_method === "manual") {
+        body.monthly_amount = values.monthly_amount;
+      } else {
+        body.interest_rate = values.interest_rate;
+      }
       const r = await fetch(`/api/loans/applications/${approvingId}/approve`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ interest_rate: values.interest_rate }),
+        body: JSON.stringify(body),
       });
       if (!r.ok) {
         const err = await r.json();
@@ -148,20 +161,54 @@ export function LoanApplicationsTable() {
         destroyOnHidden
       >
         <Form form={form} layout="vertical" className="mt-4">
-          <Form.Item
-            name="interest_rate"
-            label="Bunga (% per tahun)"
-            rules={[
-              { required: true, message: "Bunga wajib diisi" },
-              {
-                validator: (_, v) => {
-                  if (v != null && (v < 0 || v > 100)) return Promise.reject(new Error("Bunga 0–100%"));
-                  return Promise.resolve();
-                },
-              },
-            ]}
-          >
-            <InputNumber className="w-full" min={0} max={100} step={0.5} addonAfter="%" />
+          <Form.Item name="interest_method" label="Metode Perhitungan">
+            <Radio.Group>
+              <Radio value="flat_total">Flat (Total) — Bunga % untuk seluruh tenor</Radio>
+              <Radio value="flat">Flat (Tahunan) — Bunga % per tahun</Radio>
+              <Radio value="manual">Manual — Input angsuran per bulan</Radio>
+            </Radio.Group>
+          </Form.Item>
+          <Form.Item noStyle shouldUpdate={(prev, curr) => prev.interest_method !== curr.interest_method}>
+            {({ getFieldValue }) =>
+              getFieldValue("interest_method") !== "manual" ? (
+                <Form.Item
+                  name="interest_rate"
+                  label={getFieldValue("interest_method") === "flat" ? "Bunga (% per tahun)" : "Bunga (% total untuk seluruh tenor)"}
+                  rules={[
+                    { required: true, message: "Bunga wajib diisi" },
+                    {
+                      validator: (_, v) => {
+                        if (v != null && (v < 0 || v > 100)) return Promise.reject(new Error("Bunga 0–100%"));
+                        return Promise.resolve();
+                      },
+                    },
+                  ]}
+                >
+                  <InputNumber className="w-full" min={0} max={100} step={0.1} addonAfter="%" />
+                </Form.Item>
+              ) : (
+                <Form.Item
+                  name="monthly_amount"
+                  label="Angsuran per bulan (Rp)"
+                  rules={[
+                    { required: true, message: "Angsuran per bulan wajib diisi" },
+                    {
+                      validator: (_, v) => {
+                        if (v != null && v <= 0) return Promise.reject(new Error("Angsuran harus > 0"));
+                        return Promise.resolve();
+                      },
+                    },
+                  ]}
+                >
+                  <InputNumber
+                    className="w-full"
+                    min={1}
+                    formatter={(val) => `${val}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
+                    parser={((v: string | undefined) => Number(String(v ?? "").replace(/,/g, "")) || 0) as any}
+                  />
+                </Form.Item>
+              )
+            }
           </Form.Item>
         </Form>
       </Modal>

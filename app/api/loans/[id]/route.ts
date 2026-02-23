@@ -42,6 +42,7 @@ export async function GET(
       loan_number: loan.loan_number,
       member_name: loan.member_name,
       member_nik: loan.member_nik,
+      member_number: (loan as { member_number?: string | null }).member_number ?? null,
       principal_amount: Number(loan.principal_amount),
       interest_rate: Number(loan.interest_rate),
       term_months: loan.term_months,

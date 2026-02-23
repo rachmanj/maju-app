@@ -36,6 +36,7 @@ interface LoanDetail {
   loan_number: string;
   member_name: string;
   member_nik: string;
+  member_number?: string | null;
   principal_amount: number;
   interest_rate: number;
   term_months: number;
@@ -218,6 +219,8 @@ export default function LoanDetailPage() {
 
   const statusInfo = statusMap[loan.status] || { text: loan.status, status: "default" as const };
   const canPay = (loan.status === "active" || loan.status === "approved") && loan.schedules?.length > 0;
+  const totalBunga = (loan.schedules || []).reduce((sum, s) => sum + Number(s.interest_amount ?? 0), 0);
+  const totalPokok = loan.principal_amount;
 
   return (
     <div className="space-y-6">
@@ -243,13 +246,15 @@ export default function LoanDetailPage() {
       <Card title="Informasi Pinjaman">
         <Descriptions column={{ xs: 1, sm: 2, md: 3 }}>
           <Descriptions.Item label="No. Pinjaman">{loan.loan_number}</Descriptions.Item>
+          <Descriptions.Item label="No. Anggota">{loan.member_number ?? "-"}</Descriptions.Item>
           <Descriptions.Item label="Anggota">
             {loan.member_name} ({loan.member_nik})
           </Descriptions.Item>
           <Descriptions.Item label="Status">
             <Badge status={statusInfo.status} text={statusInfo.text} />
           </Descriptions.Item>
-          <Descriptions.Item label="Pokok">{formatRupiah(loan.principal_amount)}</Descriptions.Item>
+          <Descriptions.Item label="Total Pokok">{formatRupiah(totalPokok)}</Descriptions.Item>
+          <Descriptions.Item label="Total Bunga">{formatRupiah(totalBunga)}</Descriptions.Item>
           <Descriptions.Item label="Bunga">{loan.interest_rate}%</Descriptions.Item>
           <Descriptions.Item label="Tenor">{loan.term_months} bulan</Descriptions.Item>
           <Descriptions.Item label="Tanggal Disetujui">

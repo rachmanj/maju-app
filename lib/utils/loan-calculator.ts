@@ -77,6 +77,96 @@ export class LoanCalculator {
   }
   
   /**
+   * Calculate FLAT TOTAL rate: interest is % of principal for the entire term
+   * Formula: monthly_installment = (principal + (rate% × principal)) / termMonths
+   */
+  static calculateFlatTotalRate(params: {
+    principalAmount: number;
+    interestRateTotal: number; // Total interest % for entire term (e.g. 12.6 = 12.6%)
+    termMonths: number;
+  }): {
+    totalInterest: number;
+    totalAmount: number;
+    monthlyInstallment: number;
+    schedules: InstallmentSchedule[];
+  } {
+    const { principalAmount, interestRateTotal, termMonths } = params;
+    const totalInterest = principalAmount * (interestRateTotal / 100);
+    const totalAmount = principalAmount + totalInterest;
+    const monthlyInstallment = totalAmount / termMonths;
+    const monthlyPrincipal = principalAmount / termMonths;
+    const monthlyInterest = totalInterest / termMonths;
+
+    const schedules: InstallmentSchedule[] = [];
+    let remainingPrincipal = principalAmount;
+    const startDate = new Date();
+    startDate.setDate(1);
+
+    for (let i = 1; i <= termMonths; i++) {
+      const dueDate = new Date(startDate);
+      dueDate.setMonth(startDate.getMonth() + i);
+      remainingPrincipal -= monthlyPrincipal;
+      schedules.push({
+        installmentNumber: i,
+        dueDate,
+        principalAmount: monthlyPrincipal,
+        interestAmount: monthlyInterest,
+        installmentAmount: monthlyInstallment,
+        remainingPrincipal: Math.max(0, remainingPrincipal),
+      });
+    }
+    return {
+      totalInterest,
+      totalAmount,
+      monthlyInstallment,
+      schedules,
+    };
+  }
+
+  /**
+   * Generate schedule with manual fixed amount per month (same for all)
+   */
+  static calculateManualAmount(params: {
+    principalAmount: number;
+    termMonths: number;
+    monthlyAmount: number;
+  }): {
+    totalInterest: number;
+    totalAmount: number;
+    schedules: InstallmentSchedule[];
+  } {
+    const { principalAmount, termMonths, monthlyAmount } = params;
+    const totalAmount = monthlyAmount * termMonths;
+    const totalInterest = totalAmount - principalAmount;
+    const monthlyPrincipal = principalAmount / termMonths;
+    const monthlyInterest = totalInterest / termMonths;
+
+    const schedules: InstallmentSchedule[] = [];
+    let remainingPrincipal = principalAmount;
+    const startDate = new Date();
+    startDate.setDate(1);
+
+    for (let i = 1; i <= termMonths; i++) {
+      const dueDate = new Date(startDate);
+      dueDate.setMonth(startDate.getMonth() + i);
+      remainingPrincipal -= monthlyPrincipal;
+      schedules.push({
+        installmentNumber: i,
+        dueDate,
+        principalAmount: monthlyPrincipal,
+        interestAmount: monthlyInterest,
+        installmentAmount: monthlyAmount,
+        remainingPrincipal: Math.max(0, remainingPrincipal),
+      });
+    }
+    return {
+      totalInterest,
+      totalAmount,
+      schedules,
+    };
+  }
+
+  /**
    * Recalculate schedules with manual installment amounts
    */
   static recalculateWithManualAmounts(

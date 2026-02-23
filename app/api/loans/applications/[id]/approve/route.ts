@@ -23,9 +23,18 @@ export async function POST(
     }
 
     const body = await request.json().catch(() => ({}));
-    const { interest_rate, disbursed_date } = body;
+    const { interest_method = 'flat_total', interest_rate, monthly_amount, disbursed_date } = body;
 
-    if (interest_rate == null || interest_rate < 0) {
+    const method = ['flat', 'flat_total', 'manual'].includes(interest_method) ? interest_method : 'flat_total';
+
+    if (method === 'manual') {
+      if (monthly_amount == null || monthly_amount <= 0) {
+        return NextResponse.json(
+          { error: 'Angsuran per bulan (monthly_amount) wajib diisi dan harus > 0' },
+          { status: 400 }
+        );
+      }
+    } else if (interest_rate == null || interest_rate < 0) {
       return NextResponse.json(
         { error: 'Bunga (interest_rate) wajib diisi dan harus >= 0' },
         { status: 400 }
@@ -34,7 +43,9 @@ export async function POST(
 
     const userId = session.user?.id ? parseInt(session.user.id) : 0;
     const loanId = await LoanService.approveAndCreateLoan(applicationId, {
-      interest_rate: Number(interest_rate),
+      interest_method: method,
+      interest_rate: interest_rate != null ? Number(interest_rate) : undefined,
+      monthly_amount: monthly_amount != null ? Number(monthly_amount) : undefined,
       approved_by: userId,
       disbursed_date: disbursed_date ? new Date(disbursed_date) : undefined,
     });
