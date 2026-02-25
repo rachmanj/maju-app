@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import {
   Card,
   Table,
@@ -16,8 +16,10 @@ import {
   Select,
   App,
 } from "antd";
-import { ArrowLeftOutlined, DollarOutlined } from "@ant-design/icons";
+import { ArrowLeftOutlined, DollarOutlined, DeleteOutlined } from "@ant-design/icons";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
+import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
 import type { ColumnsType } from "antd/es/table";
 
 interface ScheduleRow {
@@ -56,8 +58,12 @@ const statusMap: Record<string, { text: string; status: "success" | "warning" | 
 
 export default function LoanDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const { message } = App.useApp();
+  const { data: session } = useSession();
   const id = params.id as string;
+  const roles = (session?.user as { roles?: string[] })?.roles ?? [];
+  const canDelete = hasPermission(roles, PERMISSIONS.LOAN_DELETE);
   const [loan, setLoan] = useState<LoanDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
@@ -134,6 +140,30 @@ export default function LoanDetailPage() {
     }
   };
 
+  const handleDelete = () => {
+    Modal.confirm({
+      title: "Hapus Pinjaman?",
+      content: `Pinjaman ${loan?.loan_number} beserta jadwal angsuran dan riwayat pembayaran akan dihapus permanen. Tindakan ini tidak dapat dibatalkan.`,
+      okText: "Hapus",
+      okType: "danger",
+      cancelText: "Batal",
+      onOk: async () => {
+        try {
+          const r = await fetch(`/api/loans/${id}`, { method: "DELETE" });
+          if (!r.ok) {
+            const err = await r.json();
+            throw new Error(err.error || "Gagal menghapus");
+          }
+          message.success("Pinjaman berhasil dihapus");
+          router.push("/dashboard/loans");
+        } catch (err) {
+          message.error(err instanceof Error ? err.message : "Terjadi kesalahan");
+          throw err;
+        }
+      },
+    });
+  };
+
   const openPaymentModal = (schedule?: ScheduleRow) => {
     if (schedule) {
       const remaining = Number(schedule.installment_amount) - Number(schedule.paid_amount ?? 0);
@@ -192,6 +222,16 @@ export default function LoanDetailPage() {
       key: "status",
       render: (s: string) => (s === "paid" ? "Lunas" : "Belum"),
     },
+    {
+      title: "Aksi",
+      key: "action",
+      render: (_: unknown, record: ScheduleRow) =>
+        record.status !== "paid" ? (
+          <Button type="link" size="small" onClick={() => openPaymentModal(record)}>
+            Bayar
+          </Button>
+        ) : null,
+    },
   ];
 
   if (loading) {
@@ -236,11 +276,18 @@ export default function LoanDetailPage() {
             <p className="text-muted-foreground">Detail pinjaman</p>
           </div>
         </div>
-        {canPay && (
-          <Button type="primary" icon={<DollarOutlined />} onClick={() => openPaymentModal()}>
-            Catat Pembayaran
-          </Button>
-        )}
+        <div className="flex gap-2">
+          {canPay && (
+            <Button type="primary" icon={<DollarOutlined />} onClick={() => openPaymentModal()}>
+              Catat Pembayaran
+            </Button>
+          )}
+          {canDelete && (
+            <Button type="primary" danger icon={<DeleteOutlined />} onClick={handleDelete}>
+              Hapus Pinjaman
+            </Button>
+          )}
+        </div>
       </div>
 
       <Card title="Informasi Pinjaman">

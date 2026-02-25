@@ -17,7 +17,7 @@ export const COA_ACCOUNTS: COAAccount[] = [
   { code: '1032', name: 'Bank - Rekening Deposito', account_type: 'asset' },
   { code: '1110', name: 'Deposito Berjangka (kurang dari 1 tahun)', account_type: 'asset' },
   { code: '1120', name: 'Surat Berharga', account_type: 'asset' },
-  { code: '1210', name: 'Piutang Pinjaman Anggota', account_type: 'asset', parent_code: '1210' },
+  { code: '1210', name: 'Piutang Pinjaman Anggota', account_type: 'asset' },
   { code: '1211', name: 'Piutang Pinjaman Anggota - Lancar', account_type: 'asset', parent_code: '1210' },
   { code: '1212', name: 'Piutang Pinjaman Anggota - Kurang Lancar', account_type: 'asset', parent_code: '1210' },
   { code: '1213', name: 'Piutang Pinjaman Anggota - Diragukan', account_type: 'asset', parent_code: '1210' },

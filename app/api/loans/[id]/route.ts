@@ -57,3 +57,35 @@ export async function GET(
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await auth();
+    if (!session || !hasPermission((session.user as { roles?: string[] })?.roles ?? [], PERMISSIONS.LOAN_DELETE)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { id } = await params;
+    const loanId = parseInt(id);
+    if (isNaN(loanId)) {
+      return NextResponse.json({ error: 'Invalid loan ID' }, { status: 400 });
+    }
+
+    const loan = await LoanService.getLoanById(loanId);
+    if (!loan) {
+      return NextResponse.json({ error: 'Loan not found' }, { status: 404 });
+    }
+
+    const userId = session.user?.id ? parseInt(session.user.id) : 0;
+    await LoanService.deleteLoan(loanId, userId);
+
+    return NextResponse.json({ message: 'Pinjaman berhasil dihapus' }, { status: 200 });
+  } catch (error: unknown) {
+    console.error('Error deleting loan:', error);
+    const message = error instanceof Error ? error.message : 'Failed to delete loan';
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}

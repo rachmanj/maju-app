@@ -20,14 +20,19 @@ export class JournalService {
     return row?.id ?? null;
   }
 
-  static async generateEntryNumber(): Promise<string> {
+  static async generateEntryNumber(tx?: Parameters<Parameters<typeof prisma.$transaction>[0]>[0]): Promise<string> {
+    const client = tx ?? prisma;
     const year = new Date().getFullYear();
-    const start = new Date(year, 0, 1);
-    const end = new Date(year, 11, 31, 23, 59, 59);
-    const count = await prisma.journal_entries.count({
-      where: { entry_date: { gte: start, lte: end } },
+    const prefix = `J${year}`;
+    const last = await client.journal_entries.findFirst({
+      where: { entry_number: { startsWith: prefix } },
+      orderBy: { entry_number: 'desc' },
+      select: { entry_number: true },
     });
-    return `J${year}${(count + 1).toString().padStart(6, '0')}`;
+    const nextNum = last
+      ? parseInt(last.entry_number.slice(prefix.length), 10) + 1
+      : 1;
+    return `${prefix}${nextNum.toString().padStart(6, '0')}`;
   }
 
   static async createManualEntry(data: {
@@ -47,33 +52,45 @@ export class JournalService {
       throw new Error('Journal entry must have at least 2 lines');
     }
 
-    const entryNumber = await this.generateEntryNumber();
-    const entry = await prisma.$transaction(async (tx) => {
-      const je = await tx.journal_entries.create({
-        data: {
-          entry_number: entryNumber,
-          entry_date: new Date(data.entry_date),
-          description: data.description ?? null,
-          status: 'draft',
-          created_by: data.created_by != null ? BigInt(data.created_by) : null,
-          reference_type: data.reference_type ?? null,
-          reference_id: data.reference_id != null ? BigInt(data.reference_id) : null,
-        },
-      });
-      for (const line of data.lines) {
-        await tx.journal_entry_lines.create({
-          data: {
-            journal_entry_id: je.id,
-            account_id: line.account_id,
-            debit: line.debit || 0,
-            credit: line.credit || 0,
-            description: line.description ?? null,
-          },
+    const maxRetries = 5;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        const entry = await prisma.$transaction(async (tx) => {
+          const entryNumber = await this.generateEntryNumber(tx);
+          const je = await tx.journal_entries.create({
+            data: {
+              entry_number: entryNumber,
+              entry_date: new Date(data.entry_date),
+              description: data.description ?? null,
+              status: 'draft',
+              created_by: data.created_by != null ? BigInt(data.created_by) : null,
+              reference_type: data.reference_type ?? null,
+              reference_id: data.reference_id != null ? BigInt(data.reference_id) : null,
+            },
+          });
+          for (const line of data.lines) {
+            await tx.journal_entry_lines.create({
+              data: {
+                journal_entry_id: je.id,
+                account_id: line.account_id,
+                debit: line.debit || 0,
+                credit: line.credit || 0,
+                description: line.description ?? null,
+              },
+            });
+          }
+          return je;
         });
+        return Number(entry.id);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        const code = err && typeof err === 'object' && 'code' in err ? (err as { code: string }).code : '';
+        const isUniqueError = code === 'P2002' || msg.includes('Unique constraint') || msg.includes('entry_number_key');
+        if (isUniqueError && attempt < maxRetries - 1) continue;
+        throw err;
       }
-      return je;
-    });
-    return Number(entry.id);
+    }
+    throw new Error('Failed to create journal entry after retries');
   }
 
   static async postEntry(
@@ -152,6 +169,7 @@ export class JournalService {
   static async createLoanDisbursementJournal(params: {
     principalAmount: number;
     referenceNumber?: string;
+    entryDate?: string;
     createdBy?: number;
   }): Promise<number> {
     const kasId = await this.getAccountIdByCode(ACCOUNT_CODES.KAS);
@@ -166,7 +184,7 @@ export class JournalService {
     ];
 
     const journalId = await this.createManualEntry({
-      entry_date: new Date().toISOString().split('T')[0],
+      entry_date: params.entryDate ?? new Date().toISOString().split('T')[0],
       description: `Pencairan pinjaman - ${params.referenceNumber || ''}`.trim(),
       lines,
       created_by: params.createdBy,
@@ -179,6 +197,7 @@ export class JournalService {
     principalAmount: number;
     interestAmount: number;
     referenceNumber?: string;
+    entryDate?: string;
     createdBy?: number;
   }): Promise<number> {
     const kasId = await this.getAccountIdByCode(ACCOUNT_CODES.KAS);
@@ -198,7 +217,7 @@ export class JournalService {
     }
 
     const journalId = await this.createManualEntry({
-      entry_date: new Date().toISOString().split('T')[0],
+      entry_date: params.entryDate ?? new Date().toISOString().split('T')[0],
       description: `Angsuran pinjaman - ${params.referenceNumber || ''}`.trim(),
       lines,
       created_by: params.createdBy,

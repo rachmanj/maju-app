@@ -19,6 +19,7 @@ export const PERMISSIONS = {
   LOAN_APPROVE: 'loan.approve',
   LOAN_DISBURSE: 'loan.disburse',
   LOAN_PAYMENT: 'loan.payment',
+  LOAN_DELETE: 'loan.delete',
   LOAN_CONFIGURE: 'loan.configure',
   
   // Inventory
@@ -55,6 +56,7 @@ export const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     PERMISSIONS.ADMIN_USERS,
     PERMISSIONS.ADMIN_AUDIT,
     PERMISSIONS.ADMIN_MONITORING,
+    PERMISSIONS.LOAN_DELETE,
     PERMISSIONS.MEMBER_VIEW,
     PERMISSIONS.MEMBER_CREATE,
     PERMISSIONS.MEMBER_EDIT,

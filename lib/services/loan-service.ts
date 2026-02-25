@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db/prisma';
 import type { Loan, LoanApplication, LoanSchedule } from '@/types/database';
 import { LoanCalculator } from '../utils/loan-calculator';
 import { AuditService } from './audit-service';
+import { JournalService } from './journal-service';
 
 export class LoanService {
   static async createApplication(data: {
@@ -120,7 +121,30 @@ export class LoanService {
       entity_id: Number(loan.id),
       new_values: { loan_number: loan.loan_number, principal_amount: Number(loan.principal_amount) },
     });
+    const disbursedDate = loan.disbursed_date ?? new Date();
+    await JournalService.createLoanDisbursementJournal({
+      principalAmount: Number(loan.principal_amount),
+      referenceNumber: loan.loan_number,
+      entryDate: disbursedDate.toISOString().split('T')[0],
+      createdBy: data.approved_by,
+    });
     return Number(loan.id);
+  }
+
+  static async deleteLoan(id: number, deletedBy: number): Promise<void> {
+    const loan = await prisma.loans.findUnique({
+      where: { id },
+      select: { loan_number: true, principal_amount: true },
+    });
+    if (!loan) return;
+    await prisma.loans.delete({ where: { id } });
+    await AuditService.log({
+      user_id: deletedBy,
+      action: 'loan.delete',
+      entity_type: 'loan',
+      entity_id: id,
+      old_values: { loan_number: loan.loan_number, principal_amount: Number(loan.principal_amount) },
+    });
   }
 
   static async getLoanById(id: number): Promise<Loan | null> {
@@ -364,6 +388,14 @@ export class LoanService {
       entity_type: 'loan',
       entity_id: data.loan_id,
       new_values: { payment_amount: data.payment_amount, payment_date: data.payment_date },
+    });
+    const paymentNumber = payment.payment_number ?? undefined;
+    await JournalService.createLoanPaymentJournal({
+      principalAmount: data.principal_amount,
+      interestAmount: data.interest_amount,
+      referenceNumber: paymentNumber,
+      entryDate: data.payment_date.toISOString().split('T')[0],
+      createdBy: data.created_by,
     });
     return Number(payment.id);
   }
