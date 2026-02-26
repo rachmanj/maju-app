@@ -1,5 +1,5 @@
 **Purpose**: AI's persistent knowledge base for project context and learnings
-**Last Updated**: 2026-02-23
+**Last Updated**: 2026-02-26
 
 ## Memory Maintenance Guidelines
 
@@ -26,6 +26,39 @@
 ---
 
 ## Project Memory Entries
+
+### [021] Loan Excel Upload - Opening Balance / Migrasi (2026-02-26) ✅ COMPLETE
+
+**Challenge**: Import pinjaman opening balance atau migrasi dari sistem lama via Excel.
+
+**Solution**:
+- **Mode A**: Pokok penuh, semua angsuran pending. Kolom: nomor anggota, pokok, tenor, bunga persen, metode bunga, tanggal cair.
+- **Mode B**: Sisa pokok + jadwal sisa. Kolom tambahan: sisa pokok, angsuran terakhir dibayar.
+- **Jurnal**: `createLoanOpeningBalanceJournal` — Debit Piutang (1211), Kredit Saldo Awal (3900). Akun 3900 di `lib/config/coa-codes.ts`.
+- **API**: `POST /api/loans/upload`, `GET /api/loans/upload/template`. Permission: LOAN_CREATE.
+- **UI**: `LoansUploadExcel` component di halaman Pinjaman; tombol "Upload Excel" + modal.
+
+**Key Learning**: Nomor pinjaman auto-generate. Riwayat pembayaran tidak diimpor. LoanCalculator mendukung `startDate` opsional untuk Mode B (jadwal sisa dari tanggal yang benar).
+
+**Files**: `lib/services/loan-service.ts` (importLoanFromExcelRow), `lib/services/journal-service.ts` (createLoanOpeningBalanceJournal), `lib/config/coa-codes.ts` (SALDO_AWAL 3900), `app/api/loans/upload/route.ts`, `components/loans/loans-upload-excel.tsx`
+
+---
+
+### [020] CoA Full Renumber (2026-02-26) ✅ COMPLETE
+
+**Challenge**: Restructure Chart of Accounts to new first-digit grouping (1=Aset, 2=Hutang, 3=Equity, 4=Pendapatan, 5=HPP, 6=Beban Op, 7=Non-Op, 8=Lain-lain).
+
+**Solution**:
+- **Migration**: `scripts/migrate-coa-codes.ts` updates `chart_of_accounts.code` only (keep IDs); two-phase temp codes to avoid unique constraint.
+- **Config**: `lib/config/coa-codes.ts` centralizes COA_CODES (KAS 1010, SIMPANAN_POKOK 3110, SIMPANAN_WAJIB 3111, SIMPANAN_SUKARELA 2110, PENDAPATAN_BUNGA 4110, PENDAPATAN_PENJUALAN 4210).
+- **Services**: JournalService, POS service use COA_CODES; debit accounts API filter `code in ['1010','1020','1030','1031','1032']`.
+- **Seed**: `lib/data/coa-seed.ts` rewritten with new codes; expense categories mapped to 6226 (ATK), 6227 (UMUM/OPERASIONAL).
+
+**Key Learning**: Code renumber only—no FK updates. `journal_entry_lines.account_id` references `id`; codes are display/sort only. Two-phase migration (old→TMP→new) avoids cyclic unique constraint violations.
+
+**Files**: `scripts/migrate-coa-codes.ts`, `lib/config/coa-codes.ts`, `lib/data/coa-seed.ts`, `lib/services/journal-service.ts`, `lib/services/pos-service.ts`, `app/api/savings/debit-accounts/route.ts`, `docs/coa-restructure-recommendations.md`
+
+---
 
 ### [019] Navbar Display & Auth Session Accuracy (2026-02-23) ✅ COMPLETE
 

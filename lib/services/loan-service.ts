@@ -399,4 +399,126 @@ export class LoanService {
     });
     return Number(payment.id);
   }
+
+  static async importLoanFromExcelRow(params: {
+    memberIdentifier: string;
+    principalAmount: number;
+    interestRate: number;
+    interestMethod: 'flat' | 'flat_total' | 'manual';
+    termMonths: number;
+    disbursedDate: Date;
+    monthlyAmount?: number;
+    sisaPokok?: number;
+    angsuranTerakhirDibayar?: number;
+    createdBy: number;
+  }): Promise<{ loanId: number; loanNumber: string }> {
+    const member = await prisma.members.findFirst({
+      where: {
+        deleted_at: null,
+        OR: [{ nik: params.memberIdentifier }, { member_number: params.memberIdentifier }],
+      },
+      select: { id: true },
+    });
+    if (!member) {
+      throw new Error(`Anggota tidak ditemukan: ${params.memberIdentifier}`);
+    }
+
+    const isModeB = params.sisaPokok != null && params.sisaPokok > 0 && (params.angsuranTerakhirDibayar ?? 0) > 0;
+    const effectivePrincipal = isModeB ? params.sisaPokok! : params.principalAmount;
+    const effectiveTerm = isModeB
+      ? params.termMonths - (params.angsuranTerakhirDibayar ?? 0)
+      : params.termMonths;
+
+    if (effectivePrincipal <= 0 || effectiveTerm <= 0) {
+      throw new Error('Pokok/sisa pokok dan tenor sisa harus positif');
+    }
+
+    let schedules: { installmentNumber: number; dueDate: Date; installmentAmount: number; principalAmount: number; interestAmount: number }[];
+    let interestRate: number;
+    let interestMethod: string;
+    const scheduleStartDate = new Date(params.disbursedDate);
+    scheduleStartDate.setDate(1);
+    if (isModeB) {
+      scheduleStartDate.setMonth(scheduleStartDate.getMonth() + (params.angsuranTerakhirDibayar ?? 0));
+    }
+
+    if (params.interestMethod === 'manual' && params.monthlyAmount != null) {
+      const calc = LoanCalculator.calculateManualAmount({
+        principalAmount: effectivePrincipal,
+        termMonths: effectiveTerm,
+        monthlyAmount: params.monthlyAmount,
+        startDate: scheduleStartDate,
+      });
+      schedules = calc.schedules;
+      interestRate = calc.totalInterest > 0 ? (calc.totalInterest / effectivePrincipal) * 100 : 0;
+      interestMethod = 'manual';
+    } else if (params.interestMethod === 'flat') {
+      const calc = LoanCalculator.calculateFlatRate({
+        principalAmount: effectivePrincipal,
+        interestRate: params.interestRate,
+        termMonths: effectiveTerm,
+        startDate: scheduleStartDate,
+      });
+      schedules = calc.schedules;
+      interestRate = params.interestRate;
+      interestMethod = 'flat';
+    } else {
+      const calc = LoanCalculator.calculateFlatTotalRate({
+        principalAmount: effectivePrincipal,
+        interestRateTotal: params.interestRate,
+        termMonths: effectiveTerm,
+        startDate: scheduleStartDate,
+      });
+      schedules = calc.schedules;
+      interestRate = params.interestRate;
+      interestMethod = 'flat_total';
+    }
+
+    const loan = await prisma.$transaction(async (tx) => {
+      const loanCount = await tx.loans.count();
+      const loanNumber = `LOAN${new Date().getFullYear()}${(loanCount + 1).toString().padStart(6, '0')}`;
+
+      const l = await tx.loans.create({
+        data: {
+          member_id: member.id,
+          loan_application_id: null,
+          loan_number: loanNumber,
+          principal_amount: effectivePrincipal,
+          interest_rate: interestRate,
+          interest_method: interestMethod,
+          term_months: effectiveTerm,
+          status: 'approved',
+          approved_date: params.disbursedDate,
+          disbursed_date: params.disbursedDate,
+          created_by: BigInt(params.createdBy),
+        },
+      });
+
+      for (const schedule of schedules) {
+        await tx.loan_schedules.create({
+          data: {
+            loan_id: l.id,
+            installment_number: schedule.installmentNumber,
+            due_date: schedule.dueDate,
+            original_due_date: schedule.dueDate,
+            installment_amount: schedule.installmentAmount,
+            principal_amount: schedule.principalAmount,
+            interest_amount: schedule.interestAmount,
+            status: 'pending',
+            is_manual_amount: interestMethod === 'manual',
+          },
+        });
+      }
+      return l;
+    });
+
+    await JournalService.createLoanOpeningBalanceJournal({
+      principalAmount: effectivePrincipal,
+      referenceNumber: loan.loan_number,
+      entryDate: params.disbursedDate.toISOString().split('T')[0],
+      createdBy: params.createdBy,
+    });
+
+    return { loanId: Number(loan.id), loanNumber: loan.loan_number };
+  }
 }

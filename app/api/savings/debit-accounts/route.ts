@@ -14,7 +14,7 @@ export async function GET() {
       where: {
         is_active: true,
         account_type: 'asset',
-        code: { startsWith: '10' },
+        code: { in: ['1010', '1020', '1030', '1031', '1032'] },
       },
       select: { id: true, code: true, name: true },
       orderBy: { code: 'asc' },

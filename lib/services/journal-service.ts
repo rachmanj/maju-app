@@ -1,15 +1,7 @@
 import { prisma } from '@/lib/db/prisma';
 import type { JournalEntry, JournalEntryLine } from '@/types/database';
 import { AuditService } from './audit-service';
-
-const ACCOUNT_CODES = {
-  KAS: '1010',
-  SIMPANAN_POKOK: '5110',
-  SIMPANAN_WAJIB: '5210',
-  SIMPANAN_SUKARELA: '3110',
-  PIUTANG_PINJAMAN: '1211',
-  PENDAPATAN_BUNGA: '6110',
-};
+import { COA_CODES } from '@/lib/config/coa-codes';
 
 export class JournalService {
   static async getAccountIdByCode(code: string): Promise<number | null> {
@@ -129,17 +121,17 @@ export class JournalService {
     debitAccountId?: number;
   }): Promise<number> {
     const debitAccountId =
-      params.debitAccountId ?? (await this.getAccountIdByCode(ACCOUNT_CODES.KAS));
+      params.debitAccountId ?? (await this.getAccountIdByCode(COA_CODES.KAS));
     if (!debitAccountId) {
       throw new Error('Debit account (Kas/Bank) not configured');
     }
     let liabilityId: number | null = null;
     if (params.savingsTypeCode === 'POKOK') {
-      liabilityId = await this.getAccountIdByCode(ACCOUNT_CODES.SIMPANAN_POKOK);
+      liabilityId = await this.getAccountIdByCode(COA_CODES.SIMPANAN_POKOK);
     } else if (params.savingsTypeCode === 'WAJIB') {
-      liabilityId = await this.getAccountIdByCode(ACCOUNT_CODES.SIMPANAN_WAJIB);
+      liabilityId = await this.getAccountIdByCode(COA_CODES.SIMPANAN_WAJIB);
     } else if (params.savingsTypeCode === 'SUKARELA') {
-      liabilityId = await this.getAccountIdByCode(ACCOUNT_CODES.SIMPANAN_SUKARELA);
+      liabilityId = await this.getAccountIdByCode(COA_CODES.SIMPANAN_SUKARELA);
     }
     if (!debitAccountId || !liabilityId) {
       throw new Error('Chart of accounts not configured');
@@ -172,8 +164,8 @@ export class JournalService {
     entryDate?: string;
     createdBy?: number;
   }): Promise<number> {
-    const kasId = await this.getAccountIdByCode(ACCOUNT_CODES.KAS);
-    const piutangId = await this.getAccountIdByCode(ACCOUNT_CODES.PIUTANG_PINJAMAN);
+    const kasId = await this.getAccountIdByCode(COA_CODES.KAS);
+    const piutangId = await this.getAccountIdByCode(COA_CODES.PIUTANG_PINJAMAN);
     if (!kasId || !piutangId) {
       throw new Error('Chart of accounts not configured');
     }
@@ -200,9 +192,9 @@ export class JournalService {
     entryDate?: string;
     createdBy?: number;
   }): Promise<number> {
-    const kasId = await this.getAccountIdByCode(ACCOUNT_CODES.KAS);
-    const piutangId = await this.getAccountIdByCode(ACCOUNT_CODES.PIUTANG_PINJAMAN);
-    const bungaId = await this.getAccountIdByCode(ACCOUNT_CODES.PENDAPATAN_BUNGA);
+    const kasId = await this.getAccountIdByCode(COA_CODES.KAS);
+    const piutangId = await this.getAccountIdByCode(COA_CODES.PIUTANG_PINJAMAN);
+    const bungaId = await this.getAccountIdByCode(COA_CODES.PENDAPATAN_BUNGA);
     if (!kasId || !piutangId || !bungaId) {
       throw new Error('Chart of accounts not configured');
     }
@@ -219,6 +211,33 @@ export class JournalService {
     const journalId = await this.createManualEntry({
       entry_date: params.entryDate ?? new Date().toISOString().split('T')[0],
       description: `Angsuran pinjaman - ${params.referenceNumber || ''}`.trim(),
+      lines,
+      created_by: params.createdBy,
+    });
+    await this.postEntry(journalId);
+    return journalId;
+  }
+
+  static async createLoanOpeningBalanceJournal(params: {
+    principalAmount: number;
+    referenceNumber?: string;
+    entryDate?: string;
+    createdBy?: number;
+  }): Promise<number> {
+    const piutangId = await this.getAccountIdByCode(COA_CODES.PIUTANG_PINJAMAN);
+    const saldoAwalId = await this.getAccountIdByCode(COA_CODES.SALDO_AWAL);
+    if (!piutangId || !saldoAwalId) {
+      throw new Error('Chart of accounts not configured (Piutang Pinjaman 1211, Saldo Awal 3900)');
+    }
+
+    const lines = [
+      { account_id: piutangId, debit: params.principalAmount, credit: 0, description: params.referenceNumber },
+      { account_id: saldoAwalId, debit: 0, credit: params.principalAmount, description: params.referenceNumber },
+    ];
+
+    const journalId = await this.createManualEntry({
+      entry_date: params.entryDate ?? new Date().toISOString().split('T')[0],
+      description: `Opening balance pinjaman - ${params.referenceNumber || ''}`.trim(),
       lines,
       created_by: params.createdBy,
     });

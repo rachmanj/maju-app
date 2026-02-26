@@ -20,13 +20,13 @@ export class LoanCalculator {
    * Calculate FLAT rate loan installments
    * Flat rate: Interest is calculated on the original principal amount
    */
-  static calculateFlatRate(params: LoanCalculationParams): {
+  static calculateFlatRate(params: LoanCalculationParams & { startDate?: Date }): {
     totalInterest: number;
     totalAmount: number;
     monthlyInstallment: number;
     schedules: InstallmentSchedule[];
   } {
-    const { principalAmount, interestRate, termMonths } = params;
+    const { principalAmount, interestRate, termMonths, startDate: paramStart } = params;
     
     // Monthly interest rate
     const monthlyInterestRate = interestRate / 100 / 12;
@@ -49,8 +49,8 @@ export class LoanCalculator {
     // Generate schedule
     const schedules: InstallmentSchedule[] = [];
     let remainingPrincipal = principalAmount;
-    const startDate = new Date();
-    startDate.setDate(1); // Start from first day of month
+    const startDate = paramStart ? new Date(paramStart) : new Date();
+    startDate.setDate(1);
     
     for (let i = 1; i <= termMonths; i++) {
       const dueDate = new Date(startDate);
@@ -82,15 +82,16 @@ export class LoanCalculator {
    */
   static calculateFlatTotalRate(params: {
     principalAmount: number;
-    interestRateTotal: number; // Total interest % for entire term (e.g. 12.6 = 12.6%)
+    interestRateTotal: number;
     termMonths: number;
+    startDate?: Date;
   }): {
     totalInterest: number;
     totalAmount: number;
     monthlyInstallment: number;
     schedules: InstallmentSchedule[];
   } {
-    const { principalAmount, interestRateTotal, termMonths } = params;
+    const { principalAmount, interestRateTotal, termMonths, startDate: paramStart } = params;
     const totalInterest = principalAmount * (interestRateTotal / 100);
     const totalAmount = principalAmount + totalInterest;
     const monthlyInstallment = totalAmount / termMonths;
@@ -99,7 +100,7 @@ export class LoanCalculator {
 
     const schedules: InstallmentSchedule[] = [];
     let remainingPrincipal = principalAmount;
-    const startDate = new Date();
+    const startDate = paramStart ? new Date(paramStart) : new Date();
     startDate.setDate(1);
 
     for (let i = 1; i <= termMonths; i++) {
@@ -130,12 +131,13 @@ export class LoanCalculator {
     principalAmount: number;
     termMonths: number;
     monthlyAmount: number;
+    startDate?: Date;
   }): {
     totalInterest: number;
     totalAmount: number;
     schedules: InstallmentSchedule[];
   } {
-    const { principalAmount, termMonths, monthlyAmount } = params;
+    const { principalAmount, termMonths, monthlyAmount, startDate: paramStart } = params;
     const totalAmount = monthlyAmount * termMonths;
     const totalInterest = totalAmount - principalAmount;
     const monthlyPrincipal = principalAmount / termMonths;
@@ -143,7 +145,7 @@ export class LoanCalculator {
 
     const schedules: InstallmentSchedule[] = [];
     let remainingPrincipal = principalAmount;
-    const startDate = new Date();
+    const startDate = paramStart ? new Date(paramStart) : new Date();
     startDate.setDate(1);
 
     for (let i = 1; i <= termMonths; i++) {

@@ -171,7 +171,7 @@ export class ReportService {
       WHERE coa.is_active = TRUE
       GROUP BY coa.id, coa.code, coa.name, coa.account_type
       HAVING COALESCE(SUM(jel.debit), 0) <> 0 OR COALESCE(SUM(jel.credit), 0) <> 0
-      ORDER BY coa.account_type, coa.code
+      ORDER BY coa.code
     `);
 
     const assets: { code: string; name: string; amount: number }[] = [];
@@ -219,7 +219,7 @@ export class ReportService {
       WHERE coa.is_active = TRUE AND coa.account_type IN ('revenue', 'expense')
       GROUP BY coa.id, coa.code, coa.name, coa.account_type
       HAVING COALESCE(SUM(jel.debit), 0) <> 0 OR COALESCE(SUM(jel.credit), 0) <> 0
-      ORDER BY coa.account_type, coa.code
+      ORDER BY coa.code
     `);
 
     const revenue: { code: string; name: string; amount: number }[] = [];

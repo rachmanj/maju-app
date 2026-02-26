@@ -96,16 +96,18 @@ async function main() {
   });
   if (posDevice) console.log('POS device POS-01 ready');
 
+  const bebanOpId = (await prisma.chart_of_accounts.findUnique({ where: { code: '6227' }, select: { id: true } }))?.id;
+  const bebanAtkId = (await prisma.chart_of_accounts.findUnique({ where: { code: '6226' }, select: { id: true } }))?.id;
   const expenseCategories = [
-    { code: 'UMUM', name: 'Biaya Umum' },
-    { code: 'OPERASIONAL', name: 'Biaya Operasional' },
-    { code: 'ATK', name: 'Alat Tulis Kantor' },
+    { code: 'UMUM', name: 'Biaya Umum', account_id: bebanOpId ?? null },
+    { code: 'OPERASIONAL', name: 'Biaya Operasional', account_id: bebanOpId ?? null },
+    { code: 'ATK', name: 'Alat Tulis Kantor', account_id: bebanAtkId ?? null },
   ];
   for (const c of expenseCategories) {
     await prisma.expense_categories.upsert({
       where: { code: c.code },
-      create: { code: c.code, name: c.name, is_active: true },
-      update: {},
+      create: { code: c.code, name: c.name, is_active: true, account_id: c.account_id },
+      update: { account_id: c.account_id },
     });
   }
 

@@ -4,6 +4,7 @@ import { ProductService } from './product-service';
 import { StockService } from './stock-service';
 import { SavingsService } from './savings-service';
 import { JournalService } from './journal-service';
+import { COA_CODES } from '@/lib/config/coa-codes';
 
 const PAYMENT_CASH = 'cash';
 const PAYMENT_POTONG_GAJI = 'potong_gaji';
@@ -404,10 +405,10 @@ export class POSService {
     });
 
     try {
-      const kasId = await JournalService.getAccountIdByCode('1010');
-      const piutangId = await JournalService.getAccountIdByCode('1220');
-      const simpananId = await JournalService.getAccountIdByCode('3110');
-      const pendapatanId = await JournalService.getAccountIdByCode('6210');
+      const kasId = await JournalService.getAccountIdByCode(COA_CODES.KAS);
+      const piutangId = await JournalService.getAccountIdByCode(COA_CODES.PIUTANG_PEMBELIAN);
+      const simpananId = await JournalService.getAccountIdByCode(COA_CODES.SIMPANAN_SUKARELA);
+      const pendapatanId = await JournalService.getAccountIdByCode(COA_CODES.PENDAPATAN_PENJUALAN);
       if (kasId && pendapatanId) {
         const lines: { account_id: number; debit: number; credit: number; description?: string }[] = [];
         if (params.paymentMethod === PAYMENT_CASH) {

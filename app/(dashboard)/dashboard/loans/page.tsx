@@ -1,9 +1,10 @@
 import { Suspense } from "react";
-import { Button, Card } from "antd";
+import { Button, Card, Space } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import Link from "next/link";
 import { LoansTable } from "@/components/loans/loans-table";
 import { LoanApplicationsTable } from "@/components/loans/loan-applications-table";
+import { LoansUploadExcel } from "@/components/loans/loans-upload-excel";
 
 export default function LoansPage() {
   return (
@@ -13,11 +14,14 @@ export default function LoansPage() {
           <h1 className="text-3xl font-bold">Pinjaman</h1>
           <p className="text-muted-foreground">Kelola pinjaman anggota</p>
         </div>
-        <Link href="/dashboard/loans/new">
-          <Button type="primary" icon={<PlusOutlined />}>
-            Pengajuan Baru
-          </Button>
-        </Link>
+        <Space>
+          <LoansUploadExcel />
+          <Link href="/dashboard/loans/new">
+            <Button type="primary" icon={<PlusOutlined />}>
+              Pengajuan Baru
+            </Button>
+          </Link>
+        </Space>
       </div>
 
       <Card title="Pengajuan Menunggu">
