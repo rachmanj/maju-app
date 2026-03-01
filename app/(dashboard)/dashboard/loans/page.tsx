@@ -5,6 +5,7 @@ import Link from "next/link";
 import { LoansTable } from "@/components/loans/loans-table";
 import { LoanApplicationsTable } from "@/components/loans/loan-applications-table";
 import { LoansUploadExcel } from "@/components/loans/loans-upload-excel";
+import { LoanPaymentsUploadExcel } from "@/components/loans/loan-payments-upload-excel";
 
 export default function LoansPage() {
   return (
@@ -16,6 +17,7 @@ export default function LoansPage() {
         </div>
         <Space>
           <LoansUploadExcel />
+          <LoanPaymentsUploadExcel />
           <Link href="/dashboard/loans/new">
             <Button type="primary" icon={<PlusOutlined />}>
               Pengajuan Baru

@@ -27,6 +27,22 @@
 
 ## Project Memory Entries
 
+### [022] Loan Payment Upload via Excel & Debit Account Selection (2026-02-26) ✅ COMPLETE
+
+**Challenge**: Bulk record loan installment payments via Excel; allow staff to choose Kas vs Bank for debit (manual and batch).
+
+**Solution**:
+- **JournalService/LoanService**: `createLoanPaymentJournal(debitAccountId?)`, `recordPayment(debitAccountId?)` — default Kas (1010) when not set.
+- **APIs**: `GET /api/loans/payments/debit-accounts` (codes 1010–1032); `POST /api/loans/payments/upload` (FormData: file, debit_account_id); `GET /api/loans/payments/upload/template`.
+- **Excel format**: no pinjaman, angsuran ke, tanggal pembayaran (required); jumlah, metode, referensi, catatan (optional); blank rows skipped.
+- **UI**: `LoanPaymentsUploadExcel` on loans page ("Upload Pembayaran"); manual payment modal in loan detail has debit account Select (default 1010 Kas di Kasir).
+
+**Key Learning**: Reuse Simpanan debit-accounts pattern (same COA codes) for consistency. Chrome DevTools MCP validated upload and manual payment flows.
+
+**Files**: lib/services/journal-service.ts, lib/services/loan-service.ts, app/api/loans/payments/debit-accounts/route.ts, app/api/loans/payments/upload/route.ts, components/loans/loan-payments-upload-excel.tsx, app/(dashboard)/dashboard/loans/[id]/page.tsx
+
+---
+
 ### [021] Loan Excel Upload - Opening Balance / Migrasi (2026-02-26) ✅ COMPLETE
 
 **Challenge**: Import pinjaman opening balance atau migrasi dari sistem lama via Excel.

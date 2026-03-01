@@ -106,6 +106,10 @@ export async function POST(request: NextRequest) {
       const memberId = String(row[colMap.nomor_anggota] ?? '').trim();
       const pokok = parseAmount(row[colMap.pokok]);
       const tenor = Math.floor(parseAmount(row[colMap.tenor]));
+
+      const isEmptyRow = !memberId && pokok <= 0 && tenor <= 0;
+      if (isEmptyRow) continue;
+
       const sisaPokokVal = colMap.sisa_pokok !== undefined ? parseAmount(row[colMap.sisa_pokok]) : 0;
       const angsuranDibayarVal = colMap.angsuran_terakhir_dibayar !== undefined
         ? Math.floor(parseAmount(row[colMap.angsuran_terakhir_dibayar]))

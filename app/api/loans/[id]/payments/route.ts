@@ -29,6 +29,7 @@ export async function POST(
       payment_method = 'cash',
       reference_number,
       notes,
+      debit_account_id,
     } = body;
 
     if (
@@ -43,6 +44,9 @@ export async function POST(
       );
     }
 
+    const debitAccountId =
+      debit_account_id != null && !isNaN(parseInt(debit_account_id, 10)) ? parseInt(debit_account_id, 10) : undefined;
+
     const paymentId = await LoanService.recordPayment({
       loan_id: loanId,
       loan_schedule_id: loan_schedule_id ? parseInt(loan_schedule_id) : undefined,
@@ -56,6 +60,7 @@ export async function POST(
       reference_number: reference_number || undefined,
       notes: notes || undefined,
       created_by: session.user?.id ? parseInt(session.user.id) : undefined,
+      debitAccountId,
     });
 
     return NextResponse.json({ id: paymentId, message: 'Pembayaran berhasil dicatat' }, { status: 201 });

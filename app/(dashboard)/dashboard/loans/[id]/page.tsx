@@ -68,6 +68,7 @@ export default function LoanDetailPage() {
   const [loading, setLoading] = useState(true);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [paymentSubmitting, setPaymentSubmitting] = useState(false);
+  const [debitAccounts, setDebitAccounts] = useState<{ id: number; code: string; name: string }[]>([]);
   const [form] = Form.useForm();
 
   const fetchLoan = async () => {
@@ -94,6 +95,21 @@ export default function LoanDetailPage() {
     fetchLoan();
   }, [id]);
 
+  useEffect(() => {
+    if (paymentModalOpen) {
+      fetch("/api/loans/payments/debit-accounts")
+        .then((r) => r.json())
+        .then((data) => {
+          const accounts = Array.isArray(data) ? data : [];
+          setDebitAccounts(accounts);
+          if (accounts.length > 0) {
+            form.setFieldsValue({ debit_account_id: accounts[0].id });
+          }
+        })
+        .catch(() => setDebitAccounts([]));
+    }
+  }, [paymentModalOpen, form]);
+
   const formatRupiah = (n: number) =>
     new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
 
@@ -106,6 +122,7 @@ export default function LoanDetailPage() {
     reference_number?: string;
     notes?: string;
     loan_schedule_id?: number;
+    debit_account_id?: number;
   }) => {
     setPaymentSubmitting(true);
     try {
@@ -121,6 +138,7 @@ export default function LoanDetailPage() {
           reference_number: values.reference_number || undefined,
           notes: values.notes || undefined,
           loan_schedule_id: values.loan_schedule_id || undefined,
+          debit_account_id: values.debit_account_id || undefined,
         }),
       });
 
@@ -174,11 +192,13 @@ export default function LoanDetailPage() {
         interest_amount: Number(schedule.interest_amount),
         payment_date: new Date().toISOString().slice(0, 10),
         payment_method: "cash",
+        debit_account_id: undefined,
       });
     } else {
       form.setFieldsValue({
         payment_date: new Date().toISOString().slice(0, 10),
         payment_method: "cash",
+        debit_account_id: undefined,
       });
     }
     setPaymentModalOpen(true);
@@ -328,7 +348,6 @@ export default function LoanDetailPage() {
         open={paymentModalOpen}
         onCancel={() => setPaymentModalOpen(false)}
         footer={null}
-        destroyOnHidden
       >
         <Form form={form} layout="vertical" onFinish={handleSubmitPayment}>
           <Form.Item name="loan_schedule_id" hidden>
@@ -376,6 +395,18 @@ export default function LoanDetailPage() {
             rules={[{ required: true, message: "Tanggal wajib diisi" }]}
           >
             <Input type="date" />
+          </Form.Item>
+          <Form.Item name="debit_account_id" label="Akun Debit (Kas/Bank)">
+            <Select
+              placeholder="Pilih akun Kas atau Bank (default: Kas)"
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              options={debitAccounts.map((a) => ({
+                value: a.id,
+                label: `${a.code} - ${a.name}`,
+              }))}
+            />
           </Form.Item>
           <Form.Item name="payment_method" label="Metode Pembayaran">
             <Select

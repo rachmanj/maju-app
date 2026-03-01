@@ -191,17 +191,19 @@ export class JournalService {
     referenceNumber?: string;
     entryDate?: string;
     createdBy?: number;
+    debitAccountId?: number;
   }): Promise<number> {
-    const kasId = await this.getAccountIdByCode(COA_CODES.KAS);
+    const defaultKasId = await this.getAccountIdByCode(COA_CODES.KAS);
+    const debitAccountId = params.debitAccountId ?? defaultKasId;
     const piutangId = await this.getAccountIdByCode(COA_CODES.PIUTANG_PINJAMAN);
     const bungaId = await this.getAccountIdByCode(COA_CODES.PENDAPATAN_BUNGA);
-    if (!kasId || !piutangId || !bungaId) {
+    if (!debitAccountId || !piutangId || !bungaId) {
       throw new Error('Chart of accounts not configured');
     }
 
     const totalDebit = params.principalAmount + params.interestAmount;
     const lines: { account_id: number; debit: number; credit: number; description?: string }[] = [
-      { account_id: kasId, debit: totalDebit, credit: 0, description: params.referenceNumber },
+      { account_id: debitAccountId, debit: totalDebit, credit: 0, description: params.referenceNumber },
       { account_id: piutangId, debit: 0, credit: params.principalAmount, description: params.referenceNumber },
     ];
     if (params.interestAmount > 0) {

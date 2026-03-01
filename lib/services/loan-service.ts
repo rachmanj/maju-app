@@ -335,6 +335,7 @@ export class LoanService {
     reference_number?: string;
     notes?: string;
     created_by?: number;
+    debitAccountId?: number;
   }): Promise<number> {
     const payment = await prisma.$transaction(async (tx) => {
       const payCount = await tx.loan_payments.count();
@@ -396,6 +397,7 @@ export class LoanService {
       referenceNumber: paymentNumber,
       entryDate: data.payment_date.toISOString().split('T')[0],
       createdBy: data.created_by,
+      debitAccountId: data.debitAccountId,
     });
     return Number(payment.id);
   }

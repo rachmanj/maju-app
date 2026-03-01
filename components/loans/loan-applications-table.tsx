@@ -158,7 +158,6 @@ export function LoanApplicationsTable() {
         onOk={handleApprove}
         confirmLoading={submitting}
         okText="Setujui & Disbursement"
-        destroyOnHidden
       >
         <Form form={form} layout="vertical" className="mt-4">
           <Form.Item name="interest_method" label="Metode Perhitungan">
