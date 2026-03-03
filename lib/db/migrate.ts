@@ -86,7 +86,7 @@ export async function runMigrations() {
             executedCount++;
           } catch (error: any) {
             // Ignore "table already exists" errors
-            if (!error.message.includes('already exists') && !error.message.includes('Duplicate column')) {
+            if (!error.message.includes('already exists') && !error.message.includes('Duplicate column') && !error.message.includes('Duplicate foreign key')) {
               console.error(`Error executing statement: ${trimmed.substring(0, 50)}...`);
               throw error;
             }
@@ -149,19 +149,21 @@ export async function seedInitialData() {
     }
 
     const productUnits = [
-      { code: 'PCS', name: 'Pieces' },
-      { code: 'KG', name: 'Kilogram' },
-      { code: 'L', name: 'Liter' },
-      { code: 'KARTON', name: 'Karton' },
-      { code: 'PAK', name: 'Pak' },
-      { code: 'DUS', name: 'Dus' },
+      { code: 'PCS', name: 'Pieces', is_default_base: true },
+      { code: 'KG', name: 'Kilogram', is_default_base: false },
+      { code: 'L', name: 'Liter', is_default_base: false },
+      { code: 'KARTON', name: 'Karton', is_default_base: false },
+      { code: 'PAK', name: 'Pak', is_default_base: false },
+      { code: 'DUS', name: 'Dus', is_default_base: false },
     ];
     for (const u of productUnits) {
       await connection.query(
-        'INSERT IGNORE INTO product_units (code, name) VALUES (?, ?)',
-        [u.code, u.name]
+        'INSERT IGNORE INTO product_units (code, name, is_default_base) VALUES (?, ?, ?)',
+        [u.code, u.name, u.is_default_base]
       );
     }
+    await connection.query('UPDATE product_units SET is_default_base = FALSE WHERE code != ?', ['PCS']);
+    await connection.query('UPDATE product_units SET is_default_base = TRUE WHERE code = ? LIMIT 1', ['PCS']);
     
     // Insert Chart of Accounts
     const { COA_ACCOUNTS } = await import('../data/coa-seed');

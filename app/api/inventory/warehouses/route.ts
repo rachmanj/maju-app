@@ -32,7 +32,17 @@ export async function GET(request: NextRequest) {
     const isActive = is_active === 'true' ? true : is_active === 'false' ? false : undefined;
 
     const result = await WarehouseService.list({ page, limit, search, is_active: isActive });
-    return NextResponse.json(result);
+    const serialized = {
+      warehouses: result.warehouses.map((w: Warehouse) => {
+        const out: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(w as unknown as Record<string, unknown>)) {
+          out[k] = typeof v === 'bigint' ? Number(v) : v;
+        }
+        return out;
+      }),
+      total: result.total,
+    };
+    return NextResponse.json(serialized);
   } catch (error: any) {
     console.error('Error fetching warehouses:', error);
     return NextResponse.json(

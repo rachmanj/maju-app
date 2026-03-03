@@ -50,12 +50,12 @@ async function main() {
   }
 
   const productUnits = [
-    { code: 'PCS', name: 'Pieces' },
-    { code: 'KG', name: 'Kilogram' },
-    { code: 'L', name: 'Liter' },
-    { code: 'KARTON', name: 'Karton' },
-    { code: 'PAK', name: 'Pak' },
-    { code: 'DUS', name: 'Dus' },
+    { code: 'PCS', name: 'Pieces', is_default_base: true },
+    { code: 'KG', name: 'Kilogram', is_default_base: false },
+    { code: 'L', name: 'Liter', is_default_base: false },
+    { code: 'KARTON', name: 'Karton', is_default_base: false },
+    { code: 'PAK', name: 'Pak', is_default_base: false },
+    { code: 'DUS', name: 'Dus', is_default_base: false },
   ];
   for (const u of productUnits) {
     await prisma.product_units.upsert({
@@ -63,6 +63,11 @@ async function main() {
       create: u,
       update: {},
     });
+  }
+  const pcsUnit = await prisma.product_units.findFirst({ where: { code: 'PCS' } });
+  if (pcsUnit) {
+    await prisma.product_units.updateMany({ where: { id: { not: pcsUnit.id } }, data: { is_default_base: false } });
+    await prisma.product_units.update({ where: { id: pcsUnit.id }, data: { is_default_base: true } });
   }
 
   const accountMap = new Map<string, number>();

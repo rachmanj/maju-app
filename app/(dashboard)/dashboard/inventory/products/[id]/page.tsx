@@ -13,10 +13,12 @@ interface Product {
   name: string;
   barcode?: string;
   category_name?: string;
+  base_unit_id?: number;
   base_unit_code?: string;
   base_unit_name?: string;
   description?: string;
   min_stock: number;
+  sales_price?: number;
   is_active: boolean;
 }
 
@@ -87,16 +89,14 @@ export default function ProductDetailPage() {
     fetch("/api/inventory/warehouses?all=true").then((r) => (r.ok ? r.json() : [])).then(setWarehouses);
   }, [id]);
 
-  if (loading || !product) {
-    return (
-      <div className="flex items-center justify-center min-h-[200px]">
-        <Spin size="large" />
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
+      {(loading || !product) && (
+        <div className="flex justify-center min-h-[200px]">
+          <Spin size="large" />
+        </div>
+      )}
+      <div style={{ display: loading || !product ? "none" : "block" }}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button
@@ -107,13 +107,13 @@ export default function ProductDetailPage() {
             Kembali
           </Button>
           <div>
-            <h1 className="text-3xl font-bold">{product.name}</h1>
+            <h1 className="text-3xl font-bold">{product?.name}</h1>
             <p className="text-muted-foreground">
-              Detail produk • Kode {product.code}
+              Detail produk • Kode {product?.code}
             </p>
           </div>
         </div>
-        <Link href={`/dashboard/inventory/products/${product.id}/edit`}>
+        <Link href={`/dashboard/inventory/products/${product?.id}/edit`}>
           <Button type="primary" icon={<EditOutlined />}>
             Ubah
           </Button>
@@ -123,20 +123,23 @@ export default function ProductDetailPage() {
       <Card title="Data Produk">
         <Descriptions column={2} bordered>
           <Descriptions.Item label="Kode">
-            <span className="font-mono">{product.code}</span>
+            <span className="font-mono">{product?.code}</span>
           </Descriptions.Item>
-          <Descriptions.Item label="Nama">{product.name}</Descriptions.Item>
-          <Descriptions.Item label="Barcode">{product.barcode || "-"}</Descriptions.Item>
-          <Descriptions.Item label="Kategori">{product.category_name || "-"}</Descriptions.Item>
+          <Descriptions.Item label="Nama">{product?.name}</Descriptions.Item>
+          <Descriptions.Item label="Barcode">{product?.barcode || "-"}</Descriptions.Item>
+          <Descriptions.Item label="Kategori">{product?.category_name || "-"}</Descriptions.Item>
           <Descriptions.Item label="Satuan">
-            {product.base_unit_code ? `${product.base_unit_code} (${product.base_unit_name || ""})` : "-"}
+            {product?.base_unit_code ? `${product.base_unit_code} (${product.base_unit_name || ""})` : "-"}
           </Descriptions.Item>
-          <Descriptions.Item label="Min. stok">{Number(product.min_stock) || 0}</Descriptions.Item>
+          <Descriptions.Item label="Min. stok">{Number(product?.min_stock) || 0}</Descriptions.Item>
+          <Descriptions.Item label="Harga jual">
+            {product?.sales_price != null ? Number(product.sales_price).toLocaleString("id-ID") : "-"}
+          </Descriptions.Item>
           <Descriptions.Item label="Status">
-            <Badge status={product.is_active ? "success" : "default"} text={product.is_active ? "Aktif" : "Nonaktif"} />
+            <Badge status={product?.is_active ? "success" : "default"} text={product?.is_active ? "Aktif" : "Nonaktif"} />
           </Descriptions.Item>
           <Descriptions.Item label="Deskripsi" span={2}>
-            {product.description || "-"}
+            {product?.description || "-"}
           </Descriptions.Item>
         </Descriptions>
       </Card>
@@ -148,12 +151,22 @@ export default function ProductDetailPage() {
             form={convForm}
             layout="inline"
             onFinish={async (v) => {
-              setAddingConv(true);
-              try {
+                setAddingConv(true);
+                try {
+                const toUnitId = product?.base_unit_id;
+                if (!toUnitId) {
+                  message.error("Produk belum memiliki satuan dasar");
+                  setAddingConv(false);
+                  return;
+                }
                 const r = await fetch(`/api/inventory/products/${id}/conversions`, {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify(v),
+                  body: JSON.stringify({
+                    from_unit_id: v.from_unit_id,
+                    to_unit_id: toUnitId,
+                    conversion_factor: v.conversion_factor,
+                  }),
                 });
                 if (!r.ok) throw new Error((await r.json()).error);
                 message.success("Konversi ditambah");
@@ -167,14 +180,22 @@ export default function ProductDetailPage() {
               }
             }}
           >
-            <Form.Item name="from_unit_id" rules={[{ required: true }]}>
-              <Select placeholder="Dari" options={units.map((u) => ({ value: u.id, label: u.code }))} className="w-24" />
+            <Form.Item name="from_unit_id" rules={[{ required: true, message: "Pilih satuan" }]}>
+              <Select
+                placeholder="Satuan"
+                options={units
+                  .filter((u) => u.id !== product?.base_unit_id)
+                  .map((u) => ({ value: u.id, label: u.code }))}
+                className="w-36"
+              />
             </Form.Item>
-            <Form.Item name="to_unit_id" rules={[{ required: true }]}>
-              <Select placeholder="Ke" options={units.map((u) => ({ value: u.id, label: u.code }))} className="w-24" />
-            </Form.Item>
-            <Form.Item name="conversion_factor" rules={[{ required: true }]} initialValue={1}>
-              <InputNumber min={0.000001} step={0.1} placeholder="Faktor" className="w-24" />
+            <Form.Item
+              name="conversion_factor"
+              rules={[{ required: true, message: "Faktor harus diisi" }]}
+              initialValue={1}
+              tooltip={`1 satuan = ? ${product?.base_unit_code || "satuan dasar"}`}
+            >
+              <InputNumber min={0.000001} step={0.1} placeholder={`1 = ? ${product?.base_unit_code || ""}`} className="w-28" />
             </Form.Item>
             <Form.Item>
               <Button type="primary" htmlType="submit" loading={addingConv} icon={<PlusOutlined />}>
@@ -189,8 +210,8 @@ export default function ProductDetailPage() {
           rowKey="id"
           size="small"
           columns={[
-            { title: "Dari", dataIndex: "from_unit_code", key: "from_unit_code" },
-            { title: "Ke", dataIndex: "to_unit_code", key: "to_unit_code" },
+            { title: "Satuan", dataIndex: "from_unit_code", key: "from_unit_code" },
+            { title: "Ke satuan dasar", dataIndex: "to_unit_code", key: "to_unit_code" },
             { title: "Faktor", dataIndex: "conversion_factor", key: "conversion_factor", align: "right" },
             {
               title: "",
@@ -282,6 +303,7 @@ export default function ProductDetailPage() {
           locale={{ emptyText: "Belum ada harga" }}
         />
       </Card>
+      </div>
     </div>
   );
 }

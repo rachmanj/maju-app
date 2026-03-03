@@ -19,7 +19,17 @@ export async function GET(request: NextRequest) {
     const isActive = is_active === 'true' ? true : is_active === 'false' ? false : undefined;
 
     const result = await ProductService.list({ page, limit, search, category_id, is_active: isActive });
-    return NextResponse.json(result);
+    const serialized = result.products.map((p) => {
+      const out: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(p as unknown as Record<string, unknown>)) {
+        if (typeof v === 'bigint') out[k] = Number(v);
+        else if (v && typeof v === 'object' && typeof (v as { toNumber?: () => number }).toNumber === 'function')
+          out[k] = (v as { toNumber: () => number }).toNumber();
+        else out[k] = v;
+      }
+      return out;
+    });
+    return NextResponse.json({ products: serialized, total: result.total });
   } catch (error: any) {
     console.error('Error fetching products:', error);
     return NextResponse.json(

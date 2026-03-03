@@ -10,6 +10,7 @@ export class ProductService {
     base_unit_id: number;
     description?: string;
     min_stock?: number;
+    sales_price?: number;
     created_by?: number;
   }): Promise<number> {
     const row = await prisma.products.create({
@@ -21,6 +22,7 @@ export class ProductService {
         base_unit_id: data.base_unit_id,
         description: data.description ?? null,
         min_stock: data.min_stock ?? 0,
+        sales_price: data.sales_price ?? null,
         created_by: data.created_by ?? null,
       },
     });
@@ -90,7 +92,7 @@ export class ProductService {
 
   static async update(
     id: number,
-    data: Partial<Pick<Product, 'code' | 'name' | 'barcode' | 'category_id' | 'base_unit_id' | 'description' | 'min_stock' | 'is_active'>>,
+    data: Partial<Pick<Product, 'code' | 'name' | 'barcode' | 'category_id' | 'base_unit_id' | 'description' | 'min_stock' | 'sales_price' | 'is_active'>>,
     updatedBy?: number
   ): Promise<void> {
     const update: Record<string, unknown> = { ...data };
@@ -142,13 +144,21 @@ export class ProductService {
   }
 
   static async addUnitConversion(data: { product_id: number; from_unit_id: number; to_unit_id: number; conversion_factor: number }): Promise<number> {
-    const r = await prisma.product_unit_conversions.create({
-      data: {
+    const r = await prisma.product_unit_conversions.upsert({
+      where: {
+        product_id_from_unit_id_to_unit_id: {
+          product_id: data.product_id,
+          from_unit_id: data.from_unit_id,
+          to_unit_id: data.to_unit_id,
+        },
+      },
+      create: {
         product_id: data.product_id,
         from_unit_id: data.from_unit_id,
         to_unit_id: data.to_unit_id,
         conversion_factor: data.conversion_factor,
       },
+      update: { conversion_factor: data.conversion_factor },
     });
     return Number(r.id);
   }

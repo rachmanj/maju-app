@@ -14,6 +14,7 @@ interface ProductRow {
   category_name?: string;
   base_unit_code?: string;
   min_stock: number;
+  sales_price?: number;
   is_active: boolean;
 }
 
@@ -61,6 +62,13 @@ export function ProductsTable() {
       key: "min_stock",
       align: "right",
       render: (v) => Number(v) || 0,
+    },
+    {
+      title: "Harga Jual",
+      dataIndex: "sales_price",
+      key: "sales_price",
+      align: "right",
+      render: (v) => (v != null ? Number(v).toLocaleString("id-ID") : "-"),
     },
     {
       title: "Status",

@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Button, Table, Badge, Space, App } from "antd";
-import { EyeOutlined } from "@ant-design/icons";
+import { Button, Table, Badge, Space, App, Modal } from "antd";
+import { EyeOutlined, DeleteOutlined } from "@ant-design/icons";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
+import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
 import type { ColumnsType } from "antd/es/table";
 
 interface Loan {
@@ -20,6 +22,9 @@ interface Loan {
 
 export function LoansTable() {
   const { message } = App.useApp();
+  const { data: session } = useSession();
+  const roles = (session?.user as { roles?: string[] })?.roles ?? [];
+  const canDelete = hasPermission(roles, PERMISSIONS.LOAN_DELETE);
   const [loans, setLoans] = useState<Loan[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -62,6 +67,30 @@ export function LoansTable() {
       currency: "IDR",
       minimumFractionDigits: 0,
     }).format(amount);
+  };
+
+  const handleDelete = (record: Loan) => {
+    Modal.confirm({
+      title: "Hapus Pinjaman?",
+      content: `Pinjaman ${record.loan_number} beserta jadwal angsuran dan riwayat pembayaran akan dihapus permanen. Tindakan ini tidak dapat dibatalkan.`,
+      okText: "Hapus",
+      okType: "danger",
+      cancelText: "Batal",
+      onOk: async () => {
+        try {
+          const r = await fetch(`/api/loans/${record.id}`, { method: "DELETE" });
+          if (!r.ok) {
+            const err = await r.json();
+            throw new Error(err.error || "Gagal menghapus");
+          }
+          message.success("Pinjaman berhasil dihapus");
+          fetchLoans();
+        } catch (err) {
+          message.error(err instanceof Error ? err.message : "Terjadi kesalahan");
+          throw err;
+        }
+      },
+    });
   };
 
   const getStatusBadge = (status: string) => {
@@ -130,9 +159,20 @@ export function LoansTable() {
       key: "action",
       align: "right",
       render: (_, record) => (
-        <Link href={`/dashboard/loans/${record.id}`}>
-          <Button type="link" icon={<EyeOutlined />} />
-        </Link>
+        <Space>
+          <Link href={`/dashboard/loans/${record.id}`}>
+            <Button type="link" icon={<EyeOutlined />} title="Lihat detail" />
+          </Link>
+          {canDelete && (
+            <Button
+              type="link"
+              danger
+              icon={<DeleteOutlined />}
+              onClick={() => handleDelete(record)}
+              title="Hapus pinjaman"
+            />
+          )}
+        </Space>
       ),
     },
   ];

@@ -12,6 +12,7 @@ interface ProductFormData {
   base_unit_id: number;
   description?: string;
   min_stock?: number;
+  sales_price?: number;
   is_active: boolean;
 }
 
@@ -45,6 +46,7 @@ export default function EditProductPage() {
           base_unit_id: product.base_unit_id,
           description: product.description,
           min_stock: product.min_stock ?? 0,
+          sales_price: product.sales_price ?? undefined,
           is_active: product.is_active !== false,
         });
       }
@@ -64,6 +66,7 @@ export default function EditProductPage() {
           ...values,
           category_id: values.category_id || undefined,
           min_stock: values.min_stock ?? 0,
+          sales_price: values.sales_price ?? undefined,
         }),
       });
 
@@ -135,6 +138,10 @@ export default function EditProductPage() {
 
           <Form.Item label="Min. stok" name="min_stock" initialValue={0}>
             <InputNumber min={0} className="w-full" />
+          </Form.Item>
+
+          <Form.Item label="Harga jual" name="sales_price">
+            <InputNumber min={0} className="w-full" placeholder="Harga jual default (opsional)" />
           </Form.Item>
 
           <Form.Item label="Aktif" name="is_active" valuePropName="checked" initialValue={true}>

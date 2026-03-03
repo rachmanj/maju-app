@@ -12,6 +12,7 @@ interface ProductFormData {
   base_unit_id: number;
   description?: string;
   min_stock?: number;
+  sales_price?: number;
 }
 
 export default function NewProductPage() {
@@ -26,11 +27,15 @@ export default function NewProductPage() {
     Promise.all([
       fetch("/api/inventory/categories").then((r) => r.ok ? r.json() : []),
       fetch("/api/inventory/units").then((r) => r.ok ? r.json() : []),
-    ]).then(([cats, u]) => {
+      fetch("/api/inventory/units/default-base").then((r) => (r.ok ? r.json() : { id: null })),
+    ]).then(([cats, u, defaultBase]) => {
       setCategories(cats);
       setUnits(u);
+      if (defaultBase?.id && Array.isArray(u) && u.length > 0) {
+        form.setFieldValue("base_unit_id", defaultBase.id);
+      }
     });
-  }, []);
+  }, [form]);
 
   const onSubmit = async (values: ProductFormData) => {
     setIsLoading(true);
@@ -42,6 +47,7 @@ export default function NewProductPage() {
           ...values,
           category_id: values.category_id || undefined,
           min_stock: values.min_stock ?? 0,
+          sales_price: values.sales_price ?? undefined,
         }),
       });
 
@@ -109,6 +115,10 @@ export default function NewProductPage() {
 
           <Form.Item label="Min. stok" name="min_stock" initialValue={0}>
             <InputNumber min={0} className="w-full" />
+          </Form.Item>
+
+          <Form.Item label="Harga jual" name="sales_price">
+            <InputNumber min={0} className="w-full" placeholder="Harga jual default (opsional)" />
           </Form.Item>
 
           <Form.Item label="Deskripsi" name="description">

@@ -1,5 +1,5 @@
 **Purpose**: AI's persistent knowledge base for project context and learnings
-**Last Updated**: 2026-02-26
+**Last Updated**: 2026-03-03
 
 ## Memory Maintenance Guidelines
 
@@ -26,6 +26,53 @@
 ---
 
 ## Project Memory Entries
+
+### [024] Multi-UOM: Satuan di Pengaturan & Default Base (2026-03-02) ✅ COMPLETE
+
+**Challenge**: User-defined UOMs; default base unit for new products; base unit per product needs no conversion; other UOMs convert to base.
+
+**Solution**:
+- **Schema**: `product_units.is_default_base` (boolean); migration + seed set PCS as default.
+- **Pengaturan**: Tab "Satuan (UOM)" dengan CRUD (tambah, ubah, nonaktifkan); checkbox "Jadikan satuan dasar default"; hanya satu default.
+- **API**: `GET/POST /api/settings/units`, `GET/PATCH/DELETE /api/settings/units/[id]`; `GET /api/inventory/units/default-base` untuk default base unit id.
+- **Product form**: New product pre-selects base_unit_id from default base UOM.
+- **ProductUnitService**: create, update, deactivate; enforce single default; deactivate moves default to fallback.
+
+**Key Learning**: Base unit is per product; default base in Pengaturan is UX pre-selection for new products. Other UOMs require conversion to product's base unit.
+
+**Files**: prisma/schema.prisma, lib/db/schema.sql, lib/db/migrate.ts, lib/services/product-unit-service.ts, app/api/settings/units/*, app/api/inventory/units/default-base/route.ts, components/settings/units-table.tsx, app/(dashboard)/dashboard/settings/page.tsx, app/(dashboard)/dashboard/inventory/products/new/page.tsx
+
+---
+
+### [025] Warehouse CRUD Test & List API BigInt Fix (2026-03-03) ✅ COMPLETE
+
+**Challenge**: CRUD test for Warehouse (Gudang) via Chrome DevTools MCP; list API returned 500 due to BigInt serialization.
+
+**Solution**:
+- **CRUD test**: Login (pengurus/password), Create (WHCRUD01, Gudang CRUD Test), Read (list + edit form loads detail), Update (name → Gudang CRUD Test (Updated)) — all passed. Delete not in UI (warehouses use soft delete via deleted_at; no delete button).
+- **Fix**: Warehouses list API (`GET /api/inventory/warehouses` without `?all=true`) did not serialize BigInt; added same serialization as `all` branch so `warehouses` array returns Number for id and other BigInt fields.
+
+**Key Learning**: Paginated list responses must serialize BigInt same as `?all=true`; MEMORY [006] fix applied only to `all` branch, not the default list.
+
+**Files**: app/api/inventory/warehouses/route.ts
+
+---
+
+### [023] Inventory Module: sales_price & CRUD Test (2026-03-02) ✅ COMPLETE
+
+**Challenge**: Add sales price to inventory products; validate CRUD via Chrome DevTools MCP.
+
+**Solution**:
+- **Schema**: Added `sales_price` DECIMAL(15,2) NULL to products (Prisma + lib/db/schema.sql + ALTER for existing DB).
+- **UI**: Harga jual field on create/edit forms; Harga Jual column in products table; Harga jual in product detail.
+- **API**: ProductService create/update accept sales_price; products list and product GET serialize BigInt/Decimal for JSON (same pattern as MEMORY [006], [010]).
+- **CRUD test**: Login (pengurus/password), Create (TEST001, 25.000), Read (list + detail), Update (name + 30.000) — all passed. Delete not in UI (products use soft delete via deleted_at).
+
+**Key Learning**: After Prisma schema change, restart dev server or clear .next so Node picks up regenerated client. Products API must serialize BigInt and Prisma Decimal for JSON responses.
+
+**Files**: prisma/schema.prisma, lib/db/schema.sql, lib/services/product-service.ts, app/api/inventory/products/route.ts, app/api/inventory/products/[id]/route.ts, app/(dashboard)/dashboard/inventory/products/*, components/inventory/products-table.tsx
+
+---
 
 ### [022] Loan Payment Upload via Excel & Debit Account Selection (2026-02-26) ✅ COMPLETE
 

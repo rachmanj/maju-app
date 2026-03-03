@@ -18,7 +18,15 @@ export async function GET(
     if (!product) {
       return NextResponse.json({ error: 'Product not found' }, { status: 404 });
     }
-    return NextResponse.json(product);
+    const p = product as unknown as Record<string, unknown>;
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(p)) {
+      if (typeof v === 'bigint') out[k] = Number(v);
+      else if (v && typeof v === 'object' && typeof (v as { toNumber?: () => number }).toNumber === 'function')
+        out[k] = (v as { toNumber: () => number }).toNumber();
+      else out[k] = v;
+    }
+    return NextResponse.json(out);
   } catch (error: any) {
     console.error('Error fetching product:', error);
     return NextResponse.json(

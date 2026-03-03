@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Card, Tabs } from "antd";
-import { SettingOutlined, UserOutlined, DollarOutlined, BankOutlined, ProjectOutlined, ApartmentOutlined } from "@ant-design/icons";
+import { SettingOutlined, UserOutlined, DollarOutlined, BankOutlined, ProjectOutlined, ApartmentOutlined, AppstoreOutlined } from "@ant-design/icons";
 import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
 import { UserPreferencesForm } from "@/components/settings/user-preferences-form";
 import { NotificationPreferencesForm } from "@/components/settings/notification-preferences-form";
@@ -13,6 +13,7 @@ import { LoanInterestRatesTable } from "@/components/settings/loan-interest-rate
 import { CooperativeConfigForm } from "@/components/settings/cooperative-config-form";
 import { ProjectsTable } from "@/components/settings/projects-table";
 import { DepartmentsTable } from "@/components/settings/departments-table";
+import { UnitsTable } from "@/components/settings/units-table";
 
 export default function SettingsPage() {
   const { data: session, status } = useSession();
@@ -113,6 +114,20 @@ export default function SettingsPage() {
       children: (
         <Card title="Data Departemen">
           <DepartmentsTable />
+        </Card>
+      ),
+    },
+    {
+      key: "units",
+      label: (
+        <span>
+          <AppstoreOutlined className="mr-2" />
+          Satuan (UOM)
+        </span>
+      ),
+      children: (
+        <Card title="Satuan Produk">
+          <UnitsTable />
         </Card>
       ),
     },

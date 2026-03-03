@@ -493,6 +493,7 @@ CREATE TABLE IF NOT EXISTS product_units (
     id INT PRIMARY KEY AUTO_INCREMENT,
     code VARCHAR(20) UNIQUE NOT NULL,
     name VARCHAR(100) NOT NULL,
+    is_default_base BOOLEAN DEFAULT FALSE,
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -508,6 +509,7 @@ CREATE TABLE IF NOT EXISTS products (
     base_unit_id INT NOT NULL,
     description TEXT,
     min_stock DECIMAL(15,3) DEFAULT 0,
+    sales_price DECIMAL(15,2) NULL,
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -1001,3 +1003,11 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     INDEX idx_entity (entity_type, entity_id),
     INDEX idx_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Add sales_price to products (for existing databases)
+ALTER TABLE products ADD COLUMN sales_price DECIMAL(15,2) NULL AFTER min_stock;
+
+-- Add is_default_base to product_units (for existing databases)
+ALTER TABLE product_units ADD COLUMN is_default_base BOOLEAN DEFAULT FALSE AFTER name;
+UPDATE product_units SET is_default_base = FALSE;
+UPDATE product_units SET is_default_base = TRUE WHERE code = 'PCS' LIMIT 1;

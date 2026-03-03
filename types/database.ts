@@ -333,6 +333,7 @@ export interface Product {
   base_unit_id: number;
   description?: string;
   min_stock: number;
+  sales_price?: number;
   is_active: boolean;
   created_at: Date;
   updated_at: Date;
