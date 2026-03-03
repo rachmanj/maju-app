@@ -171,6 +171,7 @@ CREATE TABLE IF NOT EXISTS member_purchase_limits (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     member_id BIGINT NOT NULL UNIQUE,
     limit_amount DECIMAL(15,2) NOT NULL DEFAULT 0,
+    order_limit_amount DECIMAL(15,2) NULL,
     effective_date DATE NOT NULL,
     expiry_date DATE NULL,
     notes TEXT,
@@ -746,6 +747,19 @@ CREATE TABLE IF NOT EXISTS pos_devices (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS pos_self_service_devices (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    ip_address VARCHAR(45) UNIQUE NOT NULL,
+    name VARCHAR(255),
+    warehouse_id BIGINT NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (warehouse_id) REFERENCES warehouses(id) ON DELETE CASCADE,
+    INDEX idx_ip_address (ip_address),
+    INDEX idx_warehouse_id (warehouse_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS pos_sessions (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     device_id BIGINT NOT NULL,
@@ -1011,3 +1025,6 @@ ALTER TABLE products ADD COLUMN sales_price DECIMAL(15,2) NULL AFTER min_stock;
 ALTER TABLE product_units ADD COLUMN is_default_base BOOLEAN DEFAULT FALSE AFTER name;
 UPDATE product_units SET is_default_base = FALSE;
 UPDATE product_units SET is_default_base = TRUE WHERE code = 'PCS' LIMIT 1;
+
+-- Add order_limit_amount to member_purchase_limits (for existing databases)
+ALTER TABLE member_purchase_limits ADD COLUMN order_limit_amount DECIMAL(15,2) NULL AFTER limit_amount;

@@ -30,6 +30,13 @@ export class OrderService {
 
     const total = params.items.reduce((sum, i) => sum + i.quantity * i.unit_price, 0);
 
+    const orderLimit = await MemberService.getOrderLimit(params.memberId);
+    if (orderLimit != null && total > orderLimit) {
+      throw new Error(
+        `Total pesanan (Rp ${total.toLocaleString('id-ID')}) melebihi batas pemesanan (Rp ${orderLimit.toLocaleString('id-ID')})`
+      );
+    }
+
     for (const item of params.items) {
       const qty = await StockService.getQuantity(params.warehouseId, item.product_id);
       if (qty < item.quantity) {

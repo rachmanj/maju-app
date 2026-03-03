@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Form, Input, Button, Card, App, Spin, Select } from "antd";
+import { Form, Input, Button, Card, App, Spin, Select, InputNumber } from "antd";
 
 interface MemberFormData {
   member_number: string;
@@ -14,6 +14,8 @@ interface MemberFormData {
   job_title?: string;
   project_id?: number;
   department_id?: number;
+  purchase_limit?: number;
+  order_limit?: number | null;
 }
 
 interface ProjectOption {
@@ -81,6 +83,8 @@ export default function EditMemberPage() {
           job_title: member.job_title || "",
           project_id: (member as { project_id?: number }).project_id || undefined,
           department_id: (member as { department_id?: number }).department_id || undefined,
+          purchase_limit: (member as { purchase_limit?: number }).purchase_limit ?? undefined,
+          order_limit: (member as { order_limit?: number | null }).order_limit ?? undefined,
         });
       } catch (error: any) {
         message.error(error.message || "Gagal memuat data anggota");
@@ -110,6 +114,8 @@ export default function EditMemberPage() {
           job_title: values.job_title || undefined,
           project_id: values.project_id || undefined,
           department_id: values.department_id || undefined,
+          purchase_limit: values.purchase_limit ?? undefined,
+          order_limit: values.order_limit != null ? values.order_limit : null,
         }),
       });
 
@@ -199,6 +205,40 @@ export default function EditMemberPage() {
                 allowClear
                 placeholder="Pilih departemen"
                 options={departments.map((d) => ({ value: d.id, label: `${d.code} - ${d.name}` }))}
+              />
+            </Form.Item>
+            <Form.Item
+              label="Batas Belanja (POS)"
+              name="purchase_limit"
+              tooltip="Limit pembelanjaan untuk Potong Gaji di kasir POS. Kosongkan atau 0 = tidak ada limit."
+            >
+              <InputNumber
+                className="w-full"
+                min={0}
+                placeholder="Rp 0"
+                formatter={(v) =>
+                  v != null && !Number.isNaN(Number(v))
+                    ? `Rp ${Number(v).toLocaleString("id-ID")}`
+                    : ""
+                }
+                parser={((v: string | undefined) => (v ? Number(v.replace(/[^\d]/g, "")) : 0)) as any}
+              />
+            </Form.Item>
+            <Form.Item
+              label="Batas Pemesanan"
+              name="order_limit"
+              tooltip="Limit nilai pesanan di Portal Anggota (menu Pemesanan). Kosongkan = tidak ada batas."
+            >
+              <InputNumber
+                className="w-full"
+                min={0}
+                placeholder="Tidak ada batas"
+                formatter={(v) =>
+                  v != null && !Number.isNaN(Number(v))
+                    ? `Rp ${Number(v).toLocaleString("id-ID")}`
+                    : ""
+                }
+                parser={((v: string | undefined) => (v ? Number(v.replace(/[^\d]/g, "")) : undefined)) as any}
               />
             </Form.Item>
           </div>

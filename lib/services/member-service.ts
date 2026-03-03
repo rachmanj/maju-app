@@ -80,12 +80,22 @@ export class MemberService {
       include: {
         project: { select: { name: true, code: true } },
         department: { select: { name: true, code: true } },
+        member_barcodes: {
+          where: { is_active: true },
+          select: { barcode: true },
+        },
       },
     });
     if (!m) return null;
+    const barcode = m.member_barcodes?.barcode ?? null;
+    const purchaseLimit = await this.getPurchaseLimit(Number(m.id));
+    const orderLimit = await this.getOrderLimit(Number(m.id));
     return {
       id: Number(m.id),
       member_number: m.member_number ?? '',
+      barcode: barcode ?? undefined,
+      purchase_limit: purchaseLimit,
+      order_limit: orderLimit ?? undefined,
       nik: m.nik ?? undefined,
       name: m.name,
       email: m.email ?? undefined,
@@ -133,6 +143,10 @@ export class MemberService {
         include: {
           project: { select: { name: true, code: true } },
           department: { select: { name: true, code: true } },
+          member_barcodes: {
+            where: { is_active: true },
+            select: { barcode: true },
+          },
         },
         orderBy: { created_at: 'desc' },
         skip,
@@ -140,9 +154,12 @@ export class MemberService {
       }),
       prisma.members.count({ where }),
     ]);
-    const list = members.map((m) => ({
+    const list = members.map((m) => {
+      const barcode = m.member_barcodes?.barcode ?? null;
+      return {
       id: Number(m.id),
       member_number: m.member_number ?? '',
+      barcode: barcode ?? undefined,
       nik: m.nik ?? undefined,
       name: m.name,
       email: m.email ?? undefined,
@@ -159,7 +176,8 @@ export class MemberService {
       department_code: m.department?.code,
       created_at: m.created_at?.toISOString(),
       updated_at: m.updated_at?.toISOString(),
-    }));
+    };
+    });
     return { members: list as unknown as Member[], total };
   }
 
@@ -273,6 +291,44 @@ export class MemberService {
       select: { limit_amount: true },
     });
     return row ? Number(row.limit_amount) : 0;
+  }
+
+  static async getOrderLimit(memberId: number): Promise<number | null> {
+    const row = await prisma.member_purchase_limits.findFirst({
+      where: {
+        member_id: memberId,
+        OR: [{ expiry_date: null }, { expiry_date: { gte: new Date() } }],
+      },
+      orderBy: { effective_date: 'desc' },
+      select: { order_limit_amount: true },
+    });
+    if (!row || row.order_limit_amount == null) return null;
+    return Number(row.order_limit_amount);
+  }
+
+  static async setOrderLimit(memberId: number, limitAmount: number | null, createdBy?: number): Promise<void> {
+    const existing = await prisma.member_purchase_limits.findUnique({
+      where: { member_id: memberId },
+    });
+    if (existing) {
+      await prisma.member_purchase_limits.update({
+        where: { member_id: memberId },
+        data: {
+          order_limit_amount: limitAmount,
+          updated_by: createdBy != null ? BigInt(createdBy) : undefined,
+        },
+      });
+    } else {
+      await prisma.member_purchase_limits.create({
+        data: {
+          member_id: memberId,
+          limit_amount: 0,
+          order_limit_amount: limitAmount,
+          effective_date: new Date(),
+          created_by: createdBy != null ? BigInt(createdBy) : null,
+        },
+      });
+    }
   }
 
   static async setPin(memberId: number, pin: string): Promise<void> {

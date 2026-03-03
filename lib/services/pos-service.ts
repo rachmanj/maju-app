@@ -83,6 +83,31 @@ export class POSService {
     return session ? { id: Number(session.id), opened_at: session.opened_at } : null;
   }
 
+  static async getOrCreateSelfServiceSession(userId: number): Promise<number> {
+    const POS_SELF_CODE = 'POS-SELF';
+    let device = await prisma.pos_devices.findFirst({
+      where: { code: POS_SELF_CODE, is_active: true },
+    });
+    if (!device) {
+      device = await prisma.pos_devices.create({
+        data: { code: POS_SELF_CODE, name: 'POS Self-Service' },
+      });
+    }
+    const existing = await prisma.pos_sessions.findFirst({
+      where: { device_id: device.id, status: 'open' },
+    });
+    if (existing) return Number(existing.id);
+    const session = await prisma.pos_sessions.create({
+      data: {
+        device_id: device.id,
+        user_id: BigInt(userId),
+        opening_cash: 0,
+        status: 'open',
+      },
+    });
+    return Number(session.id);
+  }
+
   static async lookupMember(barcodeOrEmail: string): Promise<{ id: number; name: string; limit: number; has_pin: boolean } | null> {
     const trimmed = barcodeOrEmail.trim();
     if (!trimmed) return null;
@@ -192,24 +217,37 @@ export class POSService {
     };
   }
 
-  static async searchProducts(warehouseId: number, query: string, limit = 20): Promise<
-    { id: number; code: string; name: string; barcode: string | null; quantity: number; unit_price: number; unit_id: number; unit_code: string }[]
+  static async searchProducts(
+    warehouseId: number,
+    query: string,
+    limit = 20,
+    categoryId?: number
+  ): Promise<
+    { id: number; code: string; name: string; barcode: string | null; quantity: number; unit_price: number; unit_id: number; unit_code: string; category_name?: string }[]
   > {
-    const products = await prisma.products.findMany({
-      where: {
-        deleted_at: null,
-        is_active: true,
+    const where = {
+      deleted_at: null,
+      is_active: true,
+      ...(query.trim() && {
         OR: [
           { name: { contains: query } },
           { code: { contains: query } },
           { barcode: { contains: query } },
         ],
-      },
+      }),
+      ...(categoryId != null && { category_id: categoryId }),
+    };
+
+    const products = await prisma.products.findMany({
+      where,
       take: limit,
-      include: { base_unit: { select: { id: true, code: true } } },
+      include: {
+        base_unit: { select: { id: true, code: true } },
+        category: { select: { name: true } },
+      },
     });
 
-    const result: { id: number; code: string; name: string; barcode: string | null; quantity: number; unit_price: number; unit_id: number; unit_code: string }[] = [];
+    const result: { id: number; code: string; name: string; barcode: string | null; quantity: number; unit_price: number; unit_id: number; unit_code: string; category_name?: string }[] = [];
     for (const p of products) {
       const stock = await StockService.getQuantity(warehouseId, Number(p.id));
       const prices = await ProductService.getPrices(Number(p.id), warehouseId);
@@ -224,6 +262,7 @@ export class POSService {
           unit_price: price.price,
           unit_id: price.unit_id,
           unit_code: price.unit_code ?? p.base_unit.code,
+          category_name: (p as { category?: { name: string } }).category?.name,
         });
       }
     }

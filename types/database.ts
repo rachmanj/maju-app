@@ -69,6 +69,9 @@ export interface Project {
 export interface Member {
   id: number;
   member_number: string;
+  barcode?: string;
+  purchase_limit?: number;
+  order_limit?: number | null;
   nik?: string;
   name: string;
   email?: string;

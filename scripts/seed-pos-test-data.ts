@@ -27,14 +27,20 @@ async function main() {
   const pcs = await prisma.product_units.findUnique({ where: { code: 'PCS' } });
   if (!pcs) throw new Error('PCS unit not found');
 
+  const firstWh = await prisma.warehouses.findFirst({
+    where: { deleted_at: null },
+    orderBy: { code: 'asc' },
+  });
+  const whId = firstWh ? Number(firstWh.id) : 1;
+
   const existingPrice = await prisma.product_prices.findFirst({
-    where: { product_id: 1, unit_id: pcs.id },
+    where: { product_id: 1, unit_id: pcs.id, warehouse_id: whId },
   });
   if (!existingPrice) {
     await prisma.product_prices.create({
       data: {
         product_id: 1,
-        warehouse_id: 1,
+        warehouse_id: whId,
         unit_id: pcs.id,
         price: 65000,
         effective_date: new Date(),
@@ -44,8 +50,8 @@ async function main() {
   console.log('Product price added');
 
   await prisma.warehouse_stock.upsert({
-    where: { warehouse_id_product_id: { warehouse_id: 1, product_id: 1 } },
-    create: { warehouse_id: 1, product_id: 1, quantity: 100 },
+    where: { warehouse_id_product_id: { warehouse_id: whId, product_id: 1 } },
+    create: { warehouse_id: whId, product_id: 1, quantity: 100 },
     update: { quantity: 100 },
   });
   console.log('Stock added');

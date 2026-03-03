@@ -21,6 +21,7 @@ import {
   ShoppingOutlined,
   AuditOutlined,
   LineChartOutlined,
+  TruckOutlined,
 } from "@ant-design/icons";
 import { useSidebar } from "@/lib/hooks/use-sidebar";
 import { useSession } from "next-auth/react";
@@ -44,6 +45,7 @@ function useMenuItems(): MenuProps["items"] {
     { key: "/dashboard/loans", label: "Pinjaman", icon: <CreditCardOutlined /> },
     { key: "/dashboard/accounting", label: "Akuntansi", icon: <AccountBookOutlined /> },
     { key: "/dashboard/inventory", label: "Inventory", icon: <InboxOutlined /> },
+    { key: "/dashboard/inventory/consignment", label: "Konsinyasi", icon: <TruckOutlined /> },
     { key: "/dashboard/pos", label: "POS", icon: <ShoppingCartOutlined /> },
     { key: "/dashboard/receivables", label: "Piutang", icon: <DollarOutlined /> },
     { key: "/dashboard/expenses", label: "Pengeluaran", icon: <DollarOutlined /> },
@@ -88,10 +90,12 @@ export function Sidebar() {
   const selectedKey = (() => {
     const exact = (menuItems ?? []).find(item => item?.key === pathname)?.key;
     if (exact) return exact as string;
-    const prefix = (menuItems ?? []).find(item =>
-      typeof item?.key === 'string' && pathname.startsWith(item.key + "/")
-    )?.key;
-    return (prefix ?? pathname) as string;
+    const prefixMatches = (menuItems ?? [])
+      .filter((item): item is NonNullable<typeof item> & { key: string } =>
+        item != null && typeof item.key === 'string' && pathname.startsWith(item.key + "/")
+      )
+      .sort((a, b) => (b.key.length - a.key.length));
+    return (prefixMatches[0]?.key ?? pathname) as string;
   })();
 
   return (

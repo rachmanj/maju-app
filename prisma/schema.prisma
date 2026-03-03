@@ -199,10 +199,11 @@ model member_status_history {
 }
 
 model member_purchase_limits {
-  id             BigInt   @id @default(autoincrement())
-  member_id      BigInt   @unique
-  limit_amount   Decimal  @db.Decimal(15, 2)
-  effective_date DateTime @db.Date
+  id                BigInt    @id @default(autoincrement())
+  member_id         BigInt    @unique
+  limit_amount      Decimal   @db.Decimal(15, 2)
+  order_limit_amount Decimal? @db.Decimal(15, 2)
+  effective_date    DateTime  @db.Date
   expiry_date    DateTime? @db.Date
   notes          String?  @db.Text
   created_at     DateTime? @default(now()) @db.Timestamp(0)
@@ -626,9 +627,24 @@ model warehouses {
   consignment_sales consignment_sales[]
   pos_transactions pos_transactions[]
   member_orders member_orders[]
+  pos_self_service_devices pos_self_service_devices[]
   @@index([code])
   @@index([deleted_at])
   @@map("warehouses")
+}
+
+model pos_self_service_devices {
+  id           BigInt    @id @default(autoincrement())
+  ip_address   String    @unique @db.VarChar(45)
+  name         String?   @db.VarChar(255)
+  warehouse_id BigInt
+  is_active    Boolean?  @default(true)
+  created_at   DateTime? @default(now()) @db.Timestamp(0)
+  updated_at   DateTime? @default(now()) @updatedAt @db.Timestamp(0)
+  warehouse    warehouses @relation(fields: [warehouse_id], references: [id], onDelete: Cascade)
+  @@index([ip_address])
+  @@index([warehouse_id])
+  @@map("pos_self_service_devices")
 }
 
 model product_prices {

@@ -4,10 +4,11 @@ import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { Button, Avatar, Dropdown } from "antd";
-import { UserOutlined, LogoutOutlined, LockOutlined } from "@ant-design/icons";
+import { UserOutlined, LogoutOutlined, LockOutlined, SafetyOutlined } from "@ant-design/icons";
 import type { MenuProps } from "antd";
 import Link from "next/link";
 import { ChangePasswordModal } from "@/components/auth/change-password-modal";
+import { SetPinModal } from "@/components/member/set-pin-modal";
 
 const navItems = [
   { href: "/member/dashboard", label: "Dashboard" },
@@ -21,6 +22,7 @@ export function MemberPortalNav() {
   const pathname = usePathname();
   const { data: session } = useSession();
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
+  const [setPinOpen, setSetPinOpen] = useState(false);
 
   const menuItems: MenuProps["items"] = [
     {
@@ -39,6 +41,12 @@ export function MemberPortalNav() {
       label: "Ubah Password",
       icon: <LockOutlined />,
       onClick: () => setChangePasswordOpen(true),
+    },
+    {
+      key: "set-pin",
+      label: "Atur PIN POS",
+      icon: <SafetyOutlined />,
+      onClick: () => setSetPinOpen(true),
     },
     { type: "divider" },
     {
@@ -79,6 +87,7 @@ export function MemberPortalNav() {
           open={changePasswordOpen}
           onClose={() => setChangePasswordOpen(false)}
         />
+        <SetPinModal open={setPinOpen} onClose={() => setSetPinOpen(false)} />
       </div>
     </header>
   );

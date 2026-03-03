@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Card, Tabs } from "antd";
-import { SettingOutlined, UserOutlined, DollarOutlined, BankOutlined, ProjectOutlined, ApartmentOutlined, AppstoreOutlined } from "@ant-design/icons";
+import { SettingOutlined, UserOutlined, DollarOutlined, BankOutlined, ProjectOutlined, ApartmentOutlined, AppstoreOutlined, TagsOutlined, DesktopOutlined } from "@ant-design/icons";
 import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
 import { UserPreferencesForm } from "@/components/settings/user-preferences-form";
 import { NotificationPreferencesForm } from "@/components/settings/notification-preferences-form";
@@ -14,6 +14,8 @@ import { CooperativeConfigForm } from "@/components/settings/cooperative-config-
 import { ProjectsTable } from "@/components/settings/projects-table";
 import { DepartmentsTable } from "@/components/settings/departments-table";
 import { UnitsTable } from "@/components/settings/units-table";
+import { CategoriesTable } from "@/components/settings/categories-table";
+import { POSSelfServiceDevicesTable } from "@/components/settings/pos-self-service-devices-table";
 
 export default function SettingsPage() {
   const { data: session, status } = useSession();
@@ -128,6 +130,34 @@ export default function SettingsPage() {
       children: (
         <Card title="Satuan Produk">
           <UnitsTable />
+        </Card>
+      ),
+    },
+    {
+      key: "categories",
+      label: (
+        <span>
+          <TagsOutlined className="mr-2" />
+          Kategori Produk
+        </span>
+      ),
+      children: (
+        <Card title="Kategori Produk">
+          <CategoriesTable />
+        </Card>
+      ),
+    },
+    {
+      key: "pos-self-service",
+      label: (
+        <span>
+          <DesktopOutlined className="mr-2" />
+          POS Self-Service
+        </span>
+      ),
+      children: (
+        <Card title="Device POS Self-Service (IP + Gudang)">
+          <POSSelfServiceDevicesTable />
         </Card>
       ),
     },

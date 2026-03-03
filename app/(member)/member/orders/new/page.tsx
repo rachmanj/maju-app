@@ -43,6 +43,14 @@ export default function MemberNewOrderPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [orderLimit, setOrderLimit] = useState<number | null | undefined>(undefined);
+
+  useEffect(() => {
+    fetch("/api/member-portal/order-limit")
+      .then((r) => r.json())
+      .then((d) => setOrderLimit(d.order_limit ?? null))
+      .catch(() => setOrderLimit(null));
+  }, []);
 
   useEffect(() => {
     fetch("/api/member-portal/warehouses")
@@ -335,9 +343,21 @@ export default function MemberNewOrderPage() {
           title={`Keranjang (${cart.length} item)`}
           className="shadow-sm"
           extra={
-            <span className="font-medium text-[hsl(var(--foreground))]">
-              Total: {formatRupiah(totalAmount)}
-            </span>
+            <div className="flex flex-col items-end gap-0.5">
+              {orderLimit != null && (
+                <span className="text-sm text-[hsl(var(--muted-foreground))]">
+                  Batas: {formatRupiah(orderLimit)}
+                </span>
+              )}
+              <span className="font-medium text-[hsl(var(--foreground))]">
+                Total: {formatRupiah(totalAmount)}
+              </span>
+              {orderLimit != null && totalAmount > orderLimit && (
+                <span className="text-sm text-red-600">
+                  Melebihi batas pemesanan
+                </span>
+              )}
+            </div>
           }
         >
           <Table
@@ -365,6 +385,9 @@ export default function MemberNewOrderPage() {
               type="primary"
               loading={submitting}
               onClick={submitOrder}
+              disabled={
+                orderLimit != null && totalAmount > orderLimit
+              }
             >
               Buat Pesanan
             </Button>

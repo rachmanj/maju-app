@@ -9,6 +9,7 @@ import type { ColumnsType } from "antd/es/table";
 interface Member {
   id: number;
   member_number?: string;
+  barcode?: string;
   nik: string;
   name: string;
   email?: string;
@@ -78,6 +79,12 @@ export function MembersTable() {
       title: "Nomor Anggota",
       dataIndex: "member_number",
       key: "member_number",
+      render: (text) => <span className="font-mono">{text || "-"}</span>,
+    },
+    {
+      title: "Barcode POS",
+      dataIndex: "barcode",
+      key: "barcode",
       render: (text) => <span className="font-mono">{text || "-"}</span>,
     },
     {

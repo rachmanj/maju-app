@@ -11,6 +11,9 @@ import type { ColumnsType } from "antd/es/table";
 interface Member {
   id: number;
   member_number?: string;
+  barcode?: string;
+  purchase_limit?: number;
+  order_limit?: number | null;
   nik: string;
   name: string;
   email?: string;
@@ -219,6 +222,15 @@ export default function MemberDetailPage() {
           <Descriptions.Item label="Nomor Anggota">
             <span className="font-mono">{member.member_number || "-"}</span>
           </Descriptions.Item>
+          <Descriptions.Item label="Barcode POS">
+            <span className="font-mono">{member.barcode || "-"}</span>
+          </Descriptions.Item>
+          <Descriptions.Item label="Batas Belanja (POS)">
+            {member.purchase_limit != null ? formatCurrency(member.purchase_limit) : "-"}
+          </Descriptions.Item>
+          <Descriptions.Item label="Batas Pemesanan">
+            {member.order_limit != null ? formatCurrency(member.order_limit) : "Tidak ada batas"}
+          </Descriptions.Item>
           <Descriptions.Item label="NIK">
             <span className="font-mono">{member.nik || "-"}</span>
           </Descriptions.Item>
@@ -237,7 +249,7 @@ export default function MemberDetailPage() {
               ? `${member.department_code || ""} - ${member.department_name}`.trim()
               : "-"}
           </Descriptions.Item>
-          <Descriptions.Item label="Tanggal Bergabung">
+          <Descriptions.Item label="Tanggal Bergabung" span={2}>
             {member.joined_date
               ? new Date(member.joined_date).toLocaleDateString("id-ID")
               : "-"}

@@ -27,6 +27,90 @@
 
 ## Project Memory Entries
 
+### [026] Product Categories CRUD & Sidebar Konsinyasi (2026-03-03) ✅ COMPLETE
+
+**Challenge**: Product categories had no UI; users could not add/edit categories for product form dropdown. Konsinyasi was only reachable via Inventory hub card.
+
+**Solution**:
+- **ProductCategoryService**: list (pagination, search, include_inactive), create, getById, update, deactivate; product_categories table with parent_id for hierarchy.
+- **API**: GET/POST /api/settings/categories; GET/PATCH/DELETE /api/settings/categories/[id]; ADMIN_SETTINGS permission.
+- **CategoriesTable**: Tab "Kategori Produk" in Pengaturan; CRUD modal (kode, nama, kategori induk opsional); ubah/nonaktifkan.
+- **Sidebar**: Added "Konsinyasi" menu item (TruckOutlined) linking to /dashboard/inventory/consignment; selectedKey logic uses longest prefix match so sub-routes (suppliers, receipts, etc.) highlight Konsinyasi not Inventory.
+- **Ant Design**: Modal destroyOnClose → destroyOnHidden in categories-table.
+
+**Key Learning**: Settings master data (categories, units) follow same pattern: service, /api/settings/*, table component, tab in Pengaturan. Sidebar menu selection for nested routes needs longest-prefix match when both parent and child paths exist as menu items.
+
+**Files**: lib/services/product-category-service.ts, app/api/settings/categories/*, components/settings/categories-table.tsx, app/(dashboard)/dashboard/settings/page.tsx, components/layout/sidebar.tsx, docs/user/manual-inventory.md
+
+---
+
+### [030] POS Self-Service IP Check Improvements & Build Fixes (2026-03-03) ✅ COMPLETE
+
+**Challenge**: User accessing /pos via `http://10.10.110.34:3000/pos` saw "IP tidak terdaftar" despite registering that IP; x-forwarded-for/x-real-ip often missing in dev. Production build failed with TypeScript errors.
+
+**Solution**:
+- **IP detection**: `getClientIp()` in check-access: (1) request.ip, (2) x-forwarded-for, (3) x-real-ip, (4) cf-connecting-ip, (5) Host header: localhost→127.0.0.1; else Host IPv4 regex (e.g. `10.10.110.34:3000`→`10.10.110.34`), (6) unknown.
+- **Localhost fallback**: When IP is ::1, 127.0.0.1, or unknown, try lookup in DB for 127.0.0.1 and ::1.
+- **Error message**: Always return `detectedIp` in response; UI shows "IP terdeteksi: <strong>{detectedIp}</strong>" so user can register the correct IP.
+- **Build fixes**: `order_limit` type (remove `!== ''`); InputNumber `parser` `as any`; `requireAnggotaSession` explicit `AnggotaSession` return type (fixes NextMiddleware/session.user); pos-service `where` object built inline (Prisma `Parameters` type changed).
+
+**Key Learning**: When accessing via machine IP (e.g. 10.10.110.34:3000), Host header may be the only IP source; extract IPv4 from Host as fallback. NextAuth `auth()` return type can resolve to NextMiddleware in some contexts; explicit session type in require-anggota fixes consumers.
+
+**Files**: app/api/pos-public/check-access/route.ts, app/(pos)/pos/page.tsx, lib/auth/require-anggota.ts, app/(dashboard)/dashboard/members/[id]/edit/page.tsx, lib/services/pos-service.ts
+
+---
+
+### [029] POS Self-Service: IP Whitelist + Login di /pos (2026-03-03) ✅ COMPLETE
+
+**Challenge**: POS self-service harus di luar member area, akses langsung di /pos dengan login di halaman; hanya PC terdaftar (IP); gudang otomatis dari mapping IP.
+
+**Solution**:
+- **Route /pos**: Public, tidak di member area. Cek IP via `GET /api/pos-public/check-access` → jika tidak terdaftar tampil "Akses ditolak".
+- **Login**: Form login di /pos (kredensial sama dengan main app); setelah login tampil POS interface.
+- **Tabel**: `pos_self_service_devices` (ip_address, warehouse_id, name, is_active).
+- **Pengaturan**: Tab "POS Self-Service" di Pengaturan; CRUD IP + gudang.
+- **Gudang**: Auto dari mapping IP; tidak ada dropdown.
+- **Hapus**: Link POS dari member portal nav.
+
+**Key Learning**: IP dari `x-forwarded-for` or `x-real-ip`. 127.0.0.1 dapat didaftarkan untuk development. See [030] for Host header fallback and error message improvements.
+
+**Files**: `pos_self_service_devices` (schema), lib/services/pos-self-service-device-service.ts, app/api/pos-public/check-access, app/api/settings/pos-self-service-devices/*, components/settings/pos-self-service-devices-table.tsx, app/(pos)/pos/*
+
+---
+
+### [028] POS Self-Service Route /pos (2026-03-03) ✅ COMPLETE
+
+**Challenge**: Anggota perlu halaman POS self-service terpisah dari POS kasir (dashboard) dan member portal, dengan pemilihan item via modal (search nama, filter kategori).
+
+**Solution**:
+- **Route**: `/pos` — layout `(pos)` dengan POSSelfServiceGuard (anggota + memberId only).
+- **API**: `/api/pos-public/*` (warehouses, categories, products, session, checkout) — auth via `requireAnggotaSession()`.
+- **ProductSelectionModal**: Search by name, filter by category; klik baris → modal qty → tambah ke keranjang.
+- **Session**: Device "POS-SELF" auto-created; `getOrCreateSelfServiceSession(userId)` — reuse existing or create.
+- **POSService.searchProducts**: Added optional `categoryId` param.
+- **Nav**: Link "POS" di member portal nav (later removed per [029]).
+
+**Key Learning**: Self-service POS reuses POSService.checkout; memberId from session (no barcode lookup). Device POS-SELF created on first use.
+
+**Files**: app/(pos)/pos/*, components/pos/product-selection-modal.tsx, app/api/pos-public/*, lib/auth/require-anggota.ts, lib/services/pos-service.ts, components/member/member-portal-nav.tsx
+
+---
+
+### [027] POS Module Test & Seed Warehouse Fix (2026-03-03) ✅ COMPLETE
+
+**Challenge**: POS E2E test via Chrome DevTools MCP; checkout failed "Stok tidak mencukupi" despite seed adding stock to warehouse 1.
+
+**Solution**:
+- **POS workflow**: Device → Session (Buka Sesi) → Member lookup (barcode/email) → Product search → Cart → Checkout (Cash/Potong Gaji/Simpanan).
+- **Seed fix**: `seed-pos-test-data.ts` used warehouse_id 1, but warehouses API orders by code asc; first warehouse is "002" (id 3). Updated seed to use first warehouse by code for product_prices and warehouse_stock.
+- **Test**: Login (pengurus/password), member MBR00000001, product Ultra Cokelat, Cash checkout — Transaksi POS-xxx berhasil.
+
+**Key Learning**: POS seed must align with default warehouse selection (first by code). Product_prices and warehouse_stock must exist for the warehouse the POS dropdown defaults to.
+
+**Files**: scripts/seed-pos-test-data.ts, docs/user/manual-pos.md
+
+---
+
 ### [024] Multi-UOM: Satuan di Pengaturan & Default Base (2026-03-02) ✅ COMPLETE
 
 **Challenge**: User-defined UOMs; default base unit for new products; base unit per product needs no conversion; other UOMs convert to base.

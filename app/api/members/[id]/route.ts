@@ -42,11 +42,36 @@ export async function PATCH(
     }
 
     const body = await request.json();
+    const { purchase_limit, order_limit, ...memberData } = body;
+
     await MemberService.updateMember(
       parseInt(id),
-      body,
+      memberData,
       parseInt(session.user.id)
     );
+
+    if (purchase_limit !== undefined && purchase_limit !== null) {
+      const limitAmount = Number(purchase_limit);
+      if (!Number.isNaN(limitAmount) && limitAmount >= 0) {
+        await MemberService.setPurchaseLimit(
+          parseInt(id),
+          limitAmount,
+          parseInt(session.user.id)
+        );
+      }
+    }
+
+    if (order_limit !== undefined) {
+      const limitAmount =
+        order_limit === null || order_limit === '' ? null : Number(order_limit);
+      if (limitAmount === null || (!Number.isNaN(limitAmount) && limitAmount >= 0)) {
+        await MemberService.setOrderLimit(
+          parseInt(id),
+          limitAmount,
+          parseInt(session.user.id)
+        );
+      }
+    }
 
     return NextResponse.json({ message: 'Member updated successfully' });
   } catch (error: unknown) {
