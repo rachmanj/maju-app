@@ -50,6 +50,12 @@ export function ProductsTable() {
     fetchProducts();
   }, [page, search]);
 
+  useEffect(() => {
+    const handler = () => fetchProducts();
+    window.addEventListener("products-refresh", handler);
+    return () => window.removeEventListener("products-refresh", handler);
+  }, []);
+
   const columns: ColumnsType<ProductRow> = [
     { title: "Kode", dataIndex: "code", key: "code", render: (t) => <span className="font-mono">{t}</span> },
     { title: "Nama", dataIndex: "name", key: "name", render: (t) => <span className="font-medium">{t}</span> },

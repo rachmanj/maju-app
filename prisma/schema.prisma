@@ -557,24 +557,38 @@ model product_units {
   @@map("product_units")
 }
 
+model product_upload_batches {
+  id              BigInt   @id @default(autoincrement())
+  filename        String?  @db.VarChar(255)
+  product_count   Int      @default(0)
+  success_count  Int      @default(0)
+  failed_count   Int      @default(0)
+  uploaded_at     DateTime @default(now()) @db.Timestamp(0)
+  uploaded_by     BigInt?
+  products       products[]
+  @@map("product_upload_batches")
+}
+
 model products {
-  id           BigInt   @id @default(autoincrement())
-  code         String   @unique @db.VarChar(50)
-  name         String   @db.VarChar(255)
-  barcode      String?  @db.VarChar(100)
-  category_id  Int?
-  base_unit_id Int
-  description  String?  @db.Text
-  min_stock    Decimal? @default(0) @db.Decimal(15, 3)
-  sales_price  Decimal? @db.Decimal(15, 2)
-  is_active    Boolean? @default(true)
-  created_at   DateTime? @default(now()) @db.Timestamp(0)
-  updated_at   DateTime? @default(now()) @updatedAt @db.Timestamp(0)
-  deleted_at   DateTime? @db.Timestamp(0)
-  created_by   BigInt?
-  updated_by   BigInt?
-  category     product_categories? @relation(fields: [category_id], references: [id])
-  base_unit    product_units @relation(fields: [base_unit_id], references: [id])
+  id              BigInt   @id @default(autoincrement())
+  code            String   @unique @db.VarChar(50)
+  name            String   @db.VarChar(255)
+  barcode         String?  @db.VarChar(100)
+  category_id     Int?
+  base_unit_id    Int
+  description     String?  @db.Text
+  min_stock       Decimal? @default(0) @db.Decimal(15, 3)
+  sales_price     Decimal? @db.Decimal(15, 2)
+  is_active       Boolean? @default(true)
+  created_at      DateTime? @default(now()) @db.Timestamp(0)
+  updated_at      DateTime? @default(now()) @updatedAt @db.Timestamp(0)
+  deleted_at      DateTime? @db.Timestamp(0)
+  created_by      BigInt?
+  updated_by      BigInt?
+  upload_batch_id BigInt?
+  category        product_categories? @relation(fields: [category_id], references: [id])
+  base_unit       product_units @relation(fields: [base_unit_id], references: [id])
+  upload_batch    product_upload_batches? @relation(fields: [upload_batch_id], references: [id], onDelete: SetNull)
   product_unit_conversions product_unit_conversions[]
   product_prices product_prices[]
   warehouse_stock warehouse_stock[]
@@ -588,6 +602,7 @@ model products {
   @@index([barcode])
   @@index([category_id])
   @@index([deleted_at])
+  @@index([upload_batch_id])
   @@map("products")
 }
 

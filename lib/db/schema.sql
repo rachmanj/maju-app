@@ -1028,3 +1028,17 @@ UPDATE product_units SET is_default_base = TRUE WHERE code = 'PCS' LIMIT 1;
 
 -- Add order_limit_amount to member_purchase_limits (for existing databases)
 ALTER TABLE member_purchase_limits ADD COLUMN order_limit_amount DECIMAL(15,2) NULL AFTER limit_amount;
+
+-- Product upload batches (for Excel batch upload)
+CREATE TABLE IF NOT EXISTS product_upload_batches (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    filename VARCHAR(255) NULL,
+    product_count INT DEFAULT 0,
+    success_count INT DEFAULT 0,
+    failed_count INT DEFAULT 0,
+    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    uploaded_by BIGINT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+ALTER TABLE products ADD COLUMN upload_batch_id BIGINT NULL AFTER updated_by;
+ALTER TABLE products ADD CONSTRAINT fk_products_upload_batch FOREIGN KEY (upload_batch_id) REFERENCES product_upload_batches(id) ON DELETE SET NULL;

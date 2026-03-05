@@ -27,6 +27,37 @@
 
 ## Project Memory Entries
 
+### [028] Product Excel Upload - Chrome DevTools MCP Test (2026-03-03) ✅ COMPLETE
+
+**Test**: Product Excel upload feature via Chrome DevTools MCP; login pengurus/password.
+
+**Results**:
+- **Login**: OK — pengurus/password → dashboard
+- **Navigation**: OK — Inventory → Produk → /dashboard/inventory/products
+- **Upload Excel modal**: OK — opens; shows Unduh Template, format instructions, drag area
+- **Unduh Template**: OK — link clicked (download triggered)
+- **File upload**: Not automated — MCP browser has no programmatic file input; user must drag/drop or use file picker manually
+
+**Key Learning**: Chrome DevTools MCP can test login, navigation, modal UI; file upload requires native file picker or Playwright/Cypress with file input support.
+
+---
+
+### [027] Product Excel Upload with Batch (2026-03-03) ✅ COMPLETE
+
+**Challenge**: Import produk bulk via Excel; allow user to cancel/delete batch yang baru diupload.
+
+**Solution**:
+- **Schema**: `product_upload_batches` table; `products.upload_batch_id` (nullable, FK onDelete SetNull).
+- **API**: POST /api/inventory/products/upload (create batch, parse Excel, ProductService.create with upload_batch_id); GET template; GET/DELETE batches.
+- **Delete batch**: Soft-delete products (deleted_at) where upload_batch_id = batch.id, then delete batch record.
+- **UI**: ProductsUploadExcel component (modal, batch table with Hapus, template download, dragger); products-refresh event.
+
+**Key Learning**: Batch pattern mirrors savings_upload_batches. For products, soft delete is safer than hard delete (no cascade to stock, prices). ProductService.create extended with optional upload_batch_id.
+
+**Files**: prisma/schema.prisma, lib/db/schema.sql, lib/services/product-service.ts, app/api/inventory/products/upload/*, components/inventory/products-upload-excel.tsx, app/(dashboard)/dashboard/inventory/products/page.tsx, components/inventory/products-table.tsx
+
+---
+
 ### [026] Product Categories CRUD & Sidebar Konsinyasi (2026-03-03) ✅ COMPLETE
 
 **Challenge**: Product categories had no UI; users could not add/edit categories for product form dropdown. Konsinyasi was only reachable via Inventory hub card.

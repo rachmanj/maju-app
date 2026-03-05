@@ -12,6 +12,7 @@ export class ProductService {
     min_stock?: number;
     sales_price?: number;
     created_by?: number;
+    upload_batch_id?: number;
   }): Promise<number> {
     const row = await prisma.products.create({
       data: {
@@ -24,6 +25,7 @@ export class ProductService {
         min_stock: data.min_stock ?? 0,
         sales_price: data.sales_price ?? null,
         created_by: data.created_by ?? null,
+        upload_batch_id: data.upload_batch_id != null ? BigInt(data.upload_batch_id) : null,
       },
     });
     return Number(row.id);

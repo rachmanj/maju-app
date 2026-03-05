@@ -1,8 +1,9 @@
 import { Suspense } from "react";
-import { Button, Card } from "antd";
+import { Button, Card, Space } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import Link from "next/link";
 import { ProductsTable } from "@/components/inventory/products-table";
+import { ProductsUploadExcel } from "@/components/inventory/products-upload-excel";
 
 export default function InventoryProductsPage() {
   return (
@@ -12,11 +13,14 @@ export default function InventoryProductsPage() {
           <h1 className="text-3xl font-bold">Produk</h1>
           <p className="text-muted-foreground">Daftar produk dan kategori</p>
         </div>
-        <Link href="/dashboard/inventory/products/new">
-          <Button type="primary" icon={<PlusOutlined />}>
-            Tambah Produk
-          </Button>
-        </Link>
+        <Space>
+          <ProductsUploadExcel />
+          <Link href="/dashboard/inventory/products/new">
+            <Button type="primary" icon={<PlusOutlined />}>
+              Tambah Produk
+            </Button>
+          </Link>
+        </Space>
       </div>
 
       <Card title="Daftar Produk">
