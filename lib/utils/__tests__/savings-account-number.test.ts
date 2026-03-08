@@ -15,6 +15,14 @@ describe('generateAccountNumber', () => {
     expect(generateAccountNumber(4, 'SUKARELA', 1)).toBe('SAVS00000401');
   });
 
+  it('formats SUKARELA_SHU account: SAVH + member_id_6 + urutan_2', () => {
+    expect(generateAccountNumber(4, 'SUKARELA_SHU', 1)).toBe('SAVH00000401');
+  });
+
+  it('formats SUKARELA_REGULER account: SAVR + member_id_6 + urutan_2', () => {
+    expect(generateAccountNumber(4, 'SUKARELA_REGULER', 1)).toBe('SAVR00000401');
+  });
+
   it('pads member_id to 6 digits', () => {
     expect(generateAccountNumber(123, 'POKOK', 1)).toBe('SAVP00012301');
     expect(generateAccountNumber(123456, 'POKOK', 1)).toBe('SAVP12345601');

@@ -243,7 +243,7 @@ model member_pins {
 // ========== SAVINGS ==========
 model savings_types {
   id              Int      @id @default(autoincrement())
-  code            String   @unique @db.VarChar(10)
+  code            String   @unique @db.VarChar(20)
   name            String   @db.VarChar(100)
   is_mandatory    Boolean? @default(false)
   is_withdrawable Boolean? @default(true)

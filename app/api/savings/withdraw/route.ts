@@ -35,7 +35,8 @@ export async function POST(request: NextRequest) {
       select: { savings_type: { select: { code: true } } },
     });
     const typeCode = account?.savings_type?.code;
-    if (typeCode === 'SUKARELA') {
+    const withdrawableTypes = ['SUKARELA', 'SUKARELA_SHU', 'SUKARELA_REGULER'];
+    if (typeCode && withdrawableTypes.includes(typeCode)) {
       try {
         await JournalService.createSavingsJournal({
           savingsTypeCode: typeCode,

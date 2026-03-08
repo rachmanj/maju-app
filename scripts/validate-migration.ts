@@ -61,8 +61,8 @@ async function main() {
   }
 
   const savingsTypesCount = await prisma.savings_types.count();
-  if (savingsTypesCount < 3) {
-    errors.push(`Expected at least 3 savings types (POKOK, WAJIB, SUKARELA); found ${savingsTypesCount}. Run seed.`);
+  if (savingsTypesCount < 5) {
+    errors.push(`Expected at least 5 savings types (POKOK, WAJIB, SUKARELA, SUKARELA_SHU, SUKARELA_REGULER); found ${savingsTypesCount}. Run seed.`);
   } else {
     console.log(`✓ Savings types: ${savingsTypesCount}`);
   }

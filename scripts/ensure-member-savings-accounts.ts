@@ -1,5 +1,5 @@
 /**
- * Ensures all members have 3 savings accounts (POKOK, WAJIB, SUKARELA).
+ * Ensures all members have savings accounts (POKOK, WAJIB, SUKARELA, SUKARELA_SHU, SUKARELA_REGULER).
  * Run: npm run ensure-savings-accounts
  */
 import './load-env';
@@ -12,7 +12,7 @@ async function main() {
     select: { id: true },
   });
   const types = await prisma.savings_types.findMany({
-    where: { code: { in: ['POKOK', 'WAJIB', 'SUKARELA'] } },
+    where: { code: { in: ['POKOK', 'WAJIB', 'SUKARELA', 'SUKARELA_SHU', 'SUKARELA_REGULER'] } },
     select: { id: true, code: true },
   });
   let created = 0;

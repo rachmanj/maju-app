@@ -54,14 +54,18 @@ function parseDate(val: unknown): Date | null {
 
 function resolveSavingsTypeCode(val: unknown): string | null {
   const s = String(val ?? '').toUpperCase().trim();
-  if (['POKOK', 'WAJIB', 'SUKARELA'].includes(s)) return s;
+  if (['POKOK', 'WAJIB', 'SUKARELA', 'SUKARELA_SHU', 'SUKARELA_REGULER'].includes(s)) return s;
   const map: Record<string, string> = {
     'SIMPANAN POKOK': 'POKOK',
     'SIMPANAN WAJIB': 'WAJIB',
     'SIMPANAN SUKARELA': 'SUKARELA',
+    'SIMPANAN SHU': 'SUKARELA_SHU',
+    'SUKARELA REGULER': 'SUKARELA_REGULER',
     POKOK: 'POKOK',
     WAJIB: 'WAJIB',
     SUKARELA: 'SUKARELA',
+    SHU: 'SUKARELA_SHU',
+    REGULER: 'SUKARELA_REGULER',
   };
   return map[s] ?? null;
 }

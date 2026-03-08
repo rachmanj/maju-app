@@ -1,5 +1,5 @@
 **Purpose**: AI's persistent knowledge base for project context and learnings
-**Last Updated**: 2026-03-03
+**Last Updated**: 2026-02-11
 
 ## Memory Maintenance Guidelines
 
@@ -26,6 +26,25 @@
 ---
 
 ## Project Memory Entries
+
+### [031] Simpanan Sukarela SHU vs Reguler Split (2026-02-11) ✅ COMPLETE
+
+**Challenge**: Members need to see which part of Simpanan Sukarela is from SHU (profit sharing) vs Reguler (voluntary deposits).
+
+**Solution**:
+- Added two new savings_types: SUKARELA_SHU, SUKARELA_REGULER (both withdrawable, earn interest).
+- Kept SUKARELA for legacy data; new transactions use SHU or Reguler.
+- COA: 2112 (Simpanan Sukarela SHU), 2113 (Simpanan Sukarela Reguler).
+- Account numbers: SAVH (SHU), SAVR (Reguler).
+- New members get 5 accounts (POKOK, WAJIB, SUKARELA, SUKARELA_SHU, SUKARELA_REGULER).
+- Excel upload accepts SHU, REGULER in jenis simpanan; withdraw API allows both.
+- Run ensure-member-savings-accounts to create SHU/Reguler accounts for existing members.
+
+**Key Learning**: No data migration for existing SUKARELA; ensure script adds new account types. Journal service maps SUKARELA_SHU/SUKARELA_REGULER to their COA codes.
+
+**Files**: prisma/seed.ts, lib/db/migrate.ts, lib/config/coa-codes.ts, lib/data/coa-seed.ts, lib/services/journal-service.ts, lib/utils/savings-account-number.ts, lib/services/member-service.ts, scripts/ensure-member-savings-accounts.ts, app/api/savings/upload/route.ts, app/api/savings/withdraw/route.ts, components/savings/savings-upload-excel.tsx, components/savings/savings-accounts-list.tsx, app/(member)/member/savings/page.tsx, scripts/validate-migration.ts
+
+---
 
 ### [028] Product Excel Upload - Chrome DevTools MCP Test (2026-03-03) ✅ COMPLETE
 

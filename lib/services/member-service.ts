@@ -43,15 +43,15 @@ export class MemberService {
         data: { member_id: m.id, limit_amount: 0, effective_date: new Date() },
       });
       const savingsTypes = await tx.savings_types.findMany({
-        where: { code: { in: ['POKOK', 'WAJIB', 'SUKARELA'] } },
+        where: { code: { in: ['POKOK', 'WAJIB', 'SUKARELA', 'SUKARELA_SHU', 'SUKARELA_REGULER'] } },
         orderBy: { code: 'asc' },
       });
+      const { generateAccountNumber } = await import('@/lib/utils/savings-account-number');
       for (const st of savingsTypes) {
         const count = await tx.savings_accounts.count({
           where: { member_id: m.id, savings_type_id: st.id },
         });
-        const letter = st.code === 'POKOK' ? 'P' : st.code === 'WAJIB' ? 'W' : 'S';
-        const accountNumber = `SAV${letter}${memberId.toString().padStart(6, '0')}${(count + 1).toString().padStart(2, '0')}`;
+        const accountNumber = generateAccountNumber(memberId, st.code, count + 1);
         await tx.savings_accounts.create({
           data: {
             member_id: m.id,

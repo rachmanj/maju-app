@@ -62,6 +62,8 @@ export const COA_ACCOUNTS: COAAccount[] = [
   // 2. HUTANG (2xxx)
   { code: '2110', name: 'Simpanan Sukarela Anggota', account_type: 'liability' },
   { code: '2111', name: 'Simpanan Sukarela - Bunga Belum Dibayar', account_type: 'liability', parent_code: '2110' },
+  { code: '2112', name: 'Simpanan Sukarela SHU', account_type: 'liability' },
+  { code: '2113', name: 'Simpanan Sukarela Reguler', account_type: 'liability' },
   { code: '2120', name: 'Pinjaman Bank Jangka Pendek', account_type: 'liability' },
   { code: '2121', name: 'Pinjaman Koperasi Sekunder', account_type: 'liability' },
   { code: '2122', name: 'Pinjaman Lain-lain Jangka Pendek', account_type: 'liability' },

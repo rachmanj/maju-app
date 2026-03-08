@@ -2,6 +2,8 @@ const SAVINGS_TYPE_LETTER: Record<string, string> = {
   POKOK: 'P',
   WAJIB: 'W',
   SUKARELA: 'S',
+  SUKARELA_SHU: 'H',
+  SUKARELA_REGULER: 'R',
 };
 
 export function generateAccountNumber(memberId: number, typeCode: string, sequence: number): string {

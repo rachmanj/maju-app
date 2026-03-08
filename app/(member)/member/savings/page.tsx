@@ -19,12 +19,23 @@ export default function MemberSavingsPage() {
   const [accounts, setAccounts] = useState<SavingsAccount[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const TYPE_DISPLAY_ORDER = ["POKOK", "WAJIB", "SUKARELA_SHU", "SUKARELA_REGULER"];
+  const DISPLAY_NAME_OVERRIDE: Record<string, string> = {
+    SUKARELA_REGULER: "Simpanan Sukarela",
+  };
+
   useEffect(() => {
     fetch("/api/member-portal/savings")
       .then((r) => r.json())
       .then((d) => {
-        if (Array.isArray(d)) setAccounts(d);
-        else if (d.error) throw new Error(d.error);
+        if (Array.isArray(d)) {
+          const filtered = d.filter((a: SavingsAccount) => a.savings_type_code !== "SUKARELA");
+          const sorted = filtered.sort(
+            (a: SavingsAccount, b: SavingsAccount) =>
+              TYPE_DISPLAY_ORDER.indexOf(a.savings_type_code) - TYPE_DISPLAY_ORDER.indexOf(b.savings_type_code)
+          );
+          setAccounts(sorted);
+        } else if (d.error) throw new Error(d.error);
       })
       .catch(() => setAccounts([]))
       .finally(() => setLoading(false));
@@ -35,7 +46,12 @@ export default function MemberSavingsPage() {
 
   const columns: ColumnsType<SavingsAccount> = [
     { title: "No. Rekening", dataIndex: "account_number", key: "account_number" },
-    { title: "Jenis", dataIndex: "savings_type_name", key: "savings_type_name" },
+    {
+      title: "Jenis",
+      dataIndex: "savings_type_code",
+      key: "savings_type_name",
+      render: (_: unknown, r: SavingsAccount) => DISPLAY_NAME_OVERRIDE[r.savings_type_code] ?? r.savings_type_name,
+    },
     {
       title: "Saldo",
       dataIndex: "balance",

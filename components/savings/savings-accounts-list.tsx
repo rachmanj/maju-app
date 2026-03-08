@@ -62,12 +62,24 @@ export function SavingsAccountsList() {
   const [accountsByType, setAccountsByType] = useState<Record<number, SavingsAccount[]>>({});
   const [expandedTypes, setExpandedTypes] = useState<Record<number, boolean>>({});
 
+  const TYPE_DISPLAY_ORDER = ["POKOK", "WAJIB", "SUKARELA_SHU", "SUKARELA_REGULER"];
+  const DISPLAY_NAME_OVERRIDE: Record<string, string> = {
+    SUKARELA_REGULER: "Simpanan Sukarela",
+  };
+
   const fetchTypes = useCallback(async () => {
     try {
       const response = await fetch("/api/savings");
       if (!response.ok) throw new Error("Failed to fetch savings types");
       const data = await response.json();
-      setTypes(data);
+      const filtered = (Array.isArray(data) ? data : []).filter(
+        (t: SavingsType) => t.code !== "SUKARELA"
+      );
+      const sorted = filtered.sort(
+        (a: SavingsType, b: SavingsType) =>
+          TYPE_DISPLAY_ORDER.indexOf(a.code) - TYPE_DISPLAY_ORDER.indexOf(b.code)
+      );
+      setTypes(sorted);
     } catch (error: unknown) {
       message.error((error as Error).message || "Gagal memuat data");
     } finally {
@@ -233,7 +245,7 @@ export function SavingsAccountsList() {
             <Card
               title={
                 <div className="flex items-center justify-between">
-                  <span className="text-lg">{type.name}</span>
+                  <span className="text-lg">{DISPLAY_NAME_OVERRIDE[type.code] ?? type.name}</span>
                   <div className="flex gap-2">
                     {type.is_mandatory && <Badge status="success" text="Wajib" />}
                     {type.earns_interest && <Badge status="processing" text="Bunga" />}
@@ -300,7 +312,7 @@ export function SavingsAccountsList() {
       </Row>
 
       <Modal
-        title={modalMode === "deposit" ? `Setor - ${selectedType?.name}` : `Tarik - ${selectedType?.name}`}
+        title={modalMode === "deposit" ? `Setor - ${selectedType ? (DISPLAY_NAME_OVERRIDE[selectedType.code] ?? selectedType.name) : ""}` : `Tarik - ${selectedType ? (DISPLAY_NAME_OVERRIDE[selectedType.code] ?? selectedType.name) : ""}`}
         open={modalOpen}
         onCancel={() => setModalOpen(false)}
         onOk={handleSubmit}
@@ -339,7 +351,7 @@ export function SavingsAccountsList() {
                 </div>
               ) : (
                 <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-950/30 rounded text-sm flex items-center justify-between gap-2">
-                  <span>Rekening {selectedType?.name} belum ada untuk anggota ini.</span>
+                  <span>Rekening {selectedType ? (DISPLAY_NAME_OVERRIDE[selectedType.code] ?? selectedType.name) : ""} belum ada untuk anggota ini.</span>
                   <Button
                     type="primary"
                     size="small"

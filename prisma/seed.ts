@@ -1,7 +1,6 @@
 import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
 import { PrismaMariaDb } from '@prisma/adapter-mariadb';
-import bcrypt from 'bcryptjs';
 import { COA_ACCOUNTS } from '../lib/data/coa-seed';
 
 function getDatabaseUrl(): string {
@@ -40,6 +39,8 @@ async function main() {
     { code: 'POKOK', name: 'Simpanan Pokok', is_mandatory: true, is_withdrawable: false, minimum_amount: 200000, earns_interest: false },
     { code: 'WAJIB', name: 'Simpanan Wajib', is_mandatory: true, is_withdrawable: false, minimum_amount: 100000, earns_interest: false },
     { code: 'SUKARELA', name: 'Simpanan Sukarela', is_mandatory: false, is_withdrawable: true, minimum_amount: 0, earns_interest: true },
+    { code: 'SUKARELA_SHU', name: 'Simpanan Sukarela SHU', is_mandatory: false, is_withdrawable: true, minimum_amount: 0, earns_interest: true },
+    { code: 'SUKARELA_REGULER', name: 'Simpanan Sukarela Reguler', is_mandatory: false, is_withdrawable: true, minimum_amount: 0, earns_interest: true },
   ];
   for (const t of savingsTypes) {
     await prisma.savings_types.upsert({
@@ -122,32 +123,6 @@ async function main() {
       data: { name: 'Koperasi Maju', address: null, phone: null, email: null, logo_url: null },
     });
     console.log('Cooperative config seeded');
-  }
-
-  const adminEmail = process.env.ADMIN_EMAIL || 'admin@koperasimaju.com';
-  const adminUsername = process.env.ADMIN_USERNAME || 'admin';
-  const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
-  const adminName = process.env.ADMIN_NAME || 'Administrator';
-
-  const existing = await prisma.users.findFirst({ where: { email: adminEmail } });
-  if (existing && !existing.username) {
-    await prisma.users.update({
-      where: { id: existing.id },
-      data: { username: adminUsername },
-    });
-    console.log(`Admin username set: ${adminUsername}`);
-  } else if (!existing) {
-    const passwordHash = await bcrypt.hash(adminPassword, 10);
-    const superadmin = await prisma.roles.findUnique({ where: { code: 'superadmin' } });
-    if (superadmin) {
-      const user = await prisma.users.create({
-        data: { username: adminUsername, email: adminEmail, password_hash: passwordHash, name: adminName, is_active: true },
-      });
-      await prisma.user_roles.create({
-        data: { user_id: user.id, role_id: superadmin.id },
-      });
-      console.log(`Admin user created: ${adminEmail}`);
-    }
   }
 }
 

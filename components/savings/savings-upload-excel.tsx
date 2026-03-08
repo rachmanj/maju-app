@@ -232,7 +232,7 @@ export function SavingsUploadExcel() {
           )}
           <p className="text-sm text-muted-foreground">
             Format Excel: Baris pertama header. Kolom wajib: <strong>nomor anggota</strong>,{" "}
-            <strong>jenis simpanan</strong> (POKOK/WAJIB/SUKARELA), <strong>nominal</strong>. Opsional: tanggal
+            <strong>jenis simpanan</strong> (POKOK/WAJIB/SUKARELA/SHU/REGULER), <strong>nominal</strong>. Opsional: tanggal
             transaksi, keterangan, referensi.
           </p>
           <div className="mb-4">

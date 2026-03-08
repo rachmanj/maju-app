@@ -132,6 +132,10 @@ export class JournalService {
       liabilityId = await this.getAccountIdByCode(COA_CODES.SIMPANAN_WAJIB);
     } else if (params.savingsTypeCode === 'SUKARELA') {
       liabilityId = await this.getAccountIdByCode(COA_CODES.SIMPANAN_SUKARELA);
+    } else if (params.savingsTypeCode === 'SUKARELA_SHU') {
+      liabilityId = await this.getAccountIdByCode(COA_CODES.SIMPANAN_SUKARELA_SHU);
+    } else if (params.savingsTypeCode === 'SUKARELA_REGULER') {
+      liabilityId = await this.getAccountIdByCode(COA_CODES.SIMPANAN_SUKARELA_REGULER);
     }
     if (!debitAccountId || !liabilityId) {
       throw new Error('Chart of accounts not configured');

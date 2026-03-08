@@ -137,6 +137,8 @@ export async function seedInitialData() {
       { code: 'POKOK', name: 'Simpanan Pokok', is_mandatory: true, is_withdrawable: false, minimum_amount: 200000, earns_interest: false },
       { code: 'WAJIB', name: 'Simpanan Wajib', is_mandatory: true, is_withdrawable: false, minimum_amount: 100000, earns_interest: false },
       { code: 'SUKARELA', name: 'Simpanan Sukarela', is_mandatory: false, is_withdrawable: true, minimum_amount: 0, earns_interest: true },
+      { code: 'SUKARELA_SHU', name: 'Simpanan Sukarela SHU', is_mandatory: false, is_withdrawable: true, minimum_amount: 0, earns_interest: true },
+      { code: 'SUKARELA_REGULER', name: 'Simpanan Sukarela Reguler', is_mandatory: false, is_withdrawable: true, minimum_amount: 0, earns_interest: true },
     ];
     
     for (const type of savingsTypes) {
