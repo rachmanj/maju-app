@@ -42,6 +42,8 @@
 
 **Key Learning**: No data migration for existing SUKARELA; ensure script adds new account types. Journal service maps SUKARELA_SHU/SUKARELA_REGULER to their COA codes.
 
+**Documentation**: docs/user/manual-simpanan-shu-reguler.md (manual lengkap pemisahan SHU vs Reguler).
+
 **Files**: prisma/seed.ts, lib/db/migrate.ts, lib/config/coa-codes.ts, lib/data/coa-seed.ts, lib/services/journal-service.ts, lib/utils/savings-account-number.ts, lib/services/member-service.ts, scripts/ensure-member-savings-accounts.ts, app/api/savings/upload/route.ts, app/api/savings/withdraw/route.ts, components/savings/savings-upload-excel.tsx, components/savings/savings-accounts-list.tsx, app/(member)/member/savings/page.tsx, scripts/validate-migration.ts
 
 ---

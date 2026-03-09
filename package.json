@@ -13,6 +13,7 @@
     "validate-migration": "tsx scripts/validate-migration.ts",
     "migrate-excel": "tsx scripts/migrate-excel-data.ts",
     "ensure-savings-accounts": "tsx scripts/ensure-member-savings-accounts.ts",
+    "clear-savings-transactions": "tsx scripts/clear-savings-transactions.ts",
     "migrate-coa": "tsx scripts/migrate-coa-codes.ts",
     "update-expense-categories-coa": "tsx scripts/update-expense-categories-coa.ts",
     "test": "vitest run"

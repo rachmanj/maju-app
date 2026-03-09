@@ -2,13 +2,18 @@ import { Card, Row, Col } from "antd";
 import { UserOutlined, WalletOutlined, CreditCardOutlined, RiseOutlined } from "@ant-design/icons";
 import { prisma } from "@/lib/db/prisma";
 
+const ACTIVE_LOAN_STATUSES = ['approved', 'disbursed', 'active'] as const;
+
 async function getDashboardStats() {
   try {
     const [memberCount, savingsAgg, loanCount, loanSum] = await Promise.all([
       prisma.members.count({ where: { deleted_at: null, status: 'active' } }),
       prisma.savings_accounts.aggregate({ _sum: { balance: true } }),
-      prisma.loans.count({ where: { status: 'active' } }),
-      prisma.loans.aggregate({ where: { status: 'active' }, _sum: { principal_amount: true } }),
+      prisma.loans.count({ where: { status: { in: [...ACTIVE_LOAN_STATUSES] } } }),
+      prisma.loans.aggregate({
+        where: { status: { in: [...ACTIVE_LOAN_STATUSES] } },
+        _sum: { principal_amount: true },
+      }),
     ]);
     return {
       memberCount,

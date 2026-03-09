@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { Card, Table, Spin, Button } from "antd";
+import { useParams } from "next/navigation";
+import { Card, Table, Spin, Button, Descriptions, Badge } from "antd";
 import { ArrowLeftOutlined } from "@ant-design/icons";
 import Link from "next/link";
 
@@ -17,22 +17,44 @@ interface ScheduleRow {
   status: string;
 }
 
+interface LoanDetail {
+  id: number;
+  loan_number: string;
+  member_name: string;
+  member_nik: string;
+  member_number?: string | null;
+  principal_amount: number;
+  interest_rate: number;
+  term_months: number;
+  status: string;
+  approved_date?: string;
+  disbursed_date?: string;
+  schedules: ScheduleRow[];
+}
+
+const statusMap: Record<string, { text: string; status: "success" | "warning" | "error" | "processing" | "default" }> = {
+  active: { text: "Aktif", status: "success" },
+  approved: { text: "Disetujui", status: "processing" },
+  pending: { text: "Menunggu", status: "warning" },
+  completed: { text: "Lunas", status: "default" },
+  defaulted: { text: "Macet", status: "error" },
+};
+
 export default function MemberLoanDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const id = params.id as string;
-  const [schedules, setSchedules] = useState<ScheduleRow[]>([]);
+  const [loan, setLoan] = useState<LoanDetail | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!id) return;
-    fetch(`/api/member-portal/loans/${id}/schedules`)
+    fetch(`/api/member-portal/loans/${id}`)
       .then((r) => r.json())
       .then((d) => {
         if (d.error) throw new Error(d.error);
-        setSchedules(Array.isArray(d) ? d : []);
+        setLoan(d);
       })
-      .catch(() => setSchedules([]))
+      .catch(() => setLoan(null))
       .finally(() => setLoading(false));
   }, [id]);
 
@@ -87,6 +109,24 @@ export default function MemberLoanDetailPage() {
     );
   }
 
+  if (!loan) {
+    return (
+      <div className="mx-auto max-w-4xl space-y-6">
+        <Link href="/member/loans">
+          <Button type="text" icon={<ArrowLeftOutlined />}>
+            Kembali
+          </Button>
+        </Link>
+        <Card>
+          <p className="text-muted-foreground">Pinjaman tidak ditemukan.</p>
+        </Card>
+      </div>
+    );
+  }
+
+  const statusInfo = statusMap[loan.status] || { text: loan.status, status: "default" as const };
+  const totalBunga = (loan.schedules || []).reduce((sum, s) => sum + Number(s.interest_amount ?? 0), 0);
+
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <div className="flex items-center gap-4">
@@ -95,13 +135,40 @@ export default function MemberLoanDetailPage() {
             Kembali
           </Button>
         </Link>
-        <h1 className="text-xl font-semibold">Jadwal Angsuran · Pinjaman #{id}</h1>
+        <div>
+          <h1 className="text-xl font-semibold">Pinjaman {loan.loan_number}</h1>
+          <p className="text-muted-foreground text-sm">Detail pinjaman</p>
+        </div>
       </div>
-      <Card title="Jadwal Angsuran" className="shadow-sm">
+
+      <Card title="Informasi Pinjaman">
+        <Descriptions column={{ xs: 1, sm: 2, md: 3 }}>
+          <Descriptions.Item label="No. Pinjaman">{loan.loan_number}</Descriptions.Item>
+          <Descriptions.Item label="No. Anggota">{loan.member_number ?? "-"}</Descriptions.Item>
+          <Descriptions.Item label="Anggota">
+            {loan.member_name} ({loan.member_nik})
+          </Descriptions.Item>
+          <Descriptions.Item label="Status">
+            <Badge status={statusInfo.status} text={statusInfo.text} />
+          </Descriptions.Item>
+          <Descriptions.Item label="Total Pokok">{formatRupiah(loan.principal_amount)}</Descriptions.Item>
+          <Descriptions.Item label="Total Bunga">{formatRupiah(totalBunga)}</Descriptions.Item>
+          <Descriptions.Item label="Bunga">{loan.interest_rate}%</Descriptions.Item>
+          <Descriptions.Item label="Tenor">{loan.term_months} bulan</Descriptions.Item>
+          <Descriptions.Item label="Tanggal Disetujui">
+            {loan.approved_date ? new Date(loan.approved_date).toLocaleDateString("id-ID") : "-"}
+          </Descriptions.Item>
+          <Descriptions.Item label="Tanggal Pencairan">
+            {loan.disbursed_date ? new Date(loan.disbursed_date).toLocaleDateString("id-ID") : "-"}
+          </Descriptions.Item>
+        </Descriptions>
+      </Card>
+
+      <Card title="Jadwal Angsuran">
         <Table
           rowKey="id"
           columns={columns}
-          dataSource={schedules}
+          dataSource={loan.schedules || []}
           pagination={false}
           locale={{ emptyText: "Tidak ada jadwal" }}
         />
