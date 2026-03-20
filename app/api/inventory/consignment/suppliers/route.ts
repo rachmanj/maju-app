@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth/config';
 import { ConsignmentService } from '@/lib/services/consignment-service';
 import { hasPermission, PERMISSIONS } from '@/lib/auth/permissions';
+import { toJsonSafe } from '@/lib/utils/to-json-safe';
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,7 +17,7 @@ export async function GET(request: NextRequest) {
       search: sp.get('search') || undefined,
       is_active: sp.get('is_active') === 'true' ? true : sp.get('is_active') === 'false' ? false : undefined,
     });
-    return NextResponse.json(result);
+    return NextResponse.json(toJsonSafe(result));
   } catch (error: any) {
     console.error('Consignment suppliers GET:', error);
     return NextResponse.json({ error: error.message || 'Failed to fetch suppliers' }, { status: 500 });

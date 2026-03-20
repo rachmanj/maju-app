@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth/config';
 import { ConsignmentService } from '@/lib/services/consignment-service';
 import { hasPermission, PERMISSIONS } from '@/lib/auth/permissions';
+import { toJsonSafe } from '@/lib/utils/to-json-safe';
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,7 +16,7 @@ export async function GET(request: NextRequest) {
       limit: parseInt(sp.get('limit') || '20'),
       supplier_id: sp.get('supplier_id') ? parseInt(sp.get('supplier_id')!) : undefined,
     });
-    return NextResponse.json(result);
+    return NextResponse.json(toJsonSafe(result));
   } catch (error: any) {
     console.error('Consignment settlements GET:', error);
     return NextResponse.json({ error: error.message || 'Failed to fetch settlements' }, { status: 500 });

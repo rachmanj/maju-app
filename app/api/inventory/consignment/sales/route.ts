@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth/config';
 import { ConsignmentService } from '@/lib/services/consignment-service';
 import { hasPermission, PERMISSIONS } from '@/lib/auth/permissions';
+import { toJsonSafe } from '@/lib/utils/to-json-safe';
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,7 +19,7 @@ export async function GET(request: NextRequest) {
       date_from: sp.get('date_from') || undefined,
       date_to: sp.get('date_to') || undefined,
     });
-    return NextResponse.json(result);
+    return NextResponse.json(toJsonSafe(result));
   } catch (error: any) {
     console.error('Consignment sales GET:', error);
     return NextResponse.json({ error: error.message || 'Failed to fetch sales' }, { status: 500 });

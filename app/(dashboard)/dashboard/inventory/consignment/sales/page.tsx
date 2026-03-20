@@ -5,6 +5,7 @@ import { Card, Table, Button, App, Select, DatePicker, Modal, Form, InputNumber 
 import { PlusOutlined } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 import { format } from "date-fns";
+import dayjs from "dayjs";
 
 interface SaleRow {
   id: number;
@@ -106,7 +107,7 @@ export default function ConsignmentSalesPage() {
       </Card>
 
       <Modal title="Catat Penjualan Konsinyasi" open={modalOpen} onCancel={() => setModalOpen(false)} footer={null} width={480}>
-        <Form form={form} layout="vertical" onFinish={onAddSale} initialValues={{ quantity: 1, unit_price: 0 }}>
+        <Form form={form} layout="vertical" onFinish={onAddSale} initialValues={{ quantity: 1, unit_price: 0, sale_date: dayjs() }}>
           <Form.Item name="supplier_id" label="Supplier" rules={[{ required: true }]}>
             <Select options={suppliers.map((s) => ({ value: s.id, label: s.name }))} placeholder="Pilih supplier" />
           </Form.Item>
@@ -132,7 +133,7 @@ export default function ConsignmentSalesPage() {
           <Form.Item name="unit_price" label="Harga satuan" rules={[{ required: true }]}>
             <InputNumber min={0} className="w-full" />
           </Form.Item>
-          <Form.Item name="sale_date" label="Tanggal" initialValue={new Date()}>
+          <Form.Item name="sale_date" label="Tanggal" rules={[{ required: true }]}>
             <DatePicker className="w-full" />
           </Form.Item>
           <Form.Item>

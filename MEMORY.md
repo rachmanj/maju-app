@@ -1,5 +1,5 @@
 **Purpose**: AI's persistent knowledge base for project context and learnings
-**Last Updated**: 2026-02-11
+**Last Updated**: 2026-03-20
 
 ## Memory Maintenance Guidelines
 
@@ -26,6 +26,20 @@
 ---
 
 ## Project Memory Entries
+
+### [032] Konsinyasi API BigInt + Penjualan DatePicker (2026-03-20) ✅ COMPLETE
+
+**Challenge**: Chrome DevTools MCP test of Konsinyasi — supplier list failed with `Do not know how to serialize a BigInt`; opening "Catat Penjualan" crashed with `date.isValid is not a function`.
+
+**Solution**:
+- **API**: All consignment `GET` responses use `toJsonSafe()` (`lib/utils/to-json-safe.ts`) — recursive `BigInt` → `Number`, Prisma `Decimal` via `toNumber()`, dates → ISO string.
+- **UI**: `sales/page.tsx` — Ant Design `DatePicker` expects dayjs; `initialValues.sale_date: dayjs()` on Form (not `new Date()` on Form.Item).
+
+**Key Learning**: Same pattern as products/warehouses list serialization; central helper avoids missing a nested BigInt on new consignment fields. Any new consignment GET should pass through `toJsonSafe`.
+
+**Files**: lib/utils/to-json-safe.ts, app/api/inventory/consignment/**/route.ts, app/(dashboard)/dashboard/inventory/consignment/sales/page.tsx
+
+---
 
 ### [031] Simpanan Sukarela SHU vs Reguler Split (2026-02-11) ✅ COMPLETE
 

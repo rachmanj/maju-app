@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth/config';
 import { ConsignmentService } from '@/lib/services/consignment-service';
 import { hasPermission, PERMISSIONS } from '@/lib/auth/permissions';
+import { toJsonSafe } from '@/lib/utils/to-json-safe';
 
 export async function GET(
   request: NextRequest,
@@ -16,7 +17,7 @@ export async function GET(
     const receipt = await ConsignmentService.getReceiptById(parseInt(id));
     if (!receipt) return NextResponse.json({ error: 'Receipt not found' }, { status: 404 });
     const items = await ConsignmentService.getReceiptItems(parseInt(id));
-    return NextResponse.json({ ...receipt, items });
+    return NextResponse.json(toJsonSafe({ ...receipt, items }));
   } catch (error: any) {
     console.error('Consignment receipt GET:', error);
     return NextResponse.json({ error: error.message || 'Failed to fetch receipt' }, { status: 500 });

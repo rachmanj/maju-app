@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth/config';
 import { ConsignmentService } from '@/lib/services/consignment-service';
 import { hasPermission, PERMISSIONS } from '@/lib/auth/permissions';
+import { toJsonSafe } from '@/lib/utils/to-json-safe';
 
 export async function GET(
   request: NextRequest,
@@ -15,7 +16,7 @@ export async function GET(
     }
     const supplier = await ConsignmentService.getSupplierById(parseInt(id));
     if (!supplier) return NextResponse.json({ error: 'Supplier not found' }, { status: 404 });
-    return NextResponse.json(supplier);
+    return NextResponse.json(toJsonSafe(supplier));
   } catch (error: any) {
     console.error('Consignment supplier GET:', error);
     return NextResponse.json({ error: error.message || 'Failed to fetch supplier' }, { status: 500 });
