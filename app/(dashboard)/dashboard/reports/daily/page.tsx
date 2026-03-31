@@ -1,19 +1,32 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Card, Button, Table, Tabs, Input } from "antd";
 import { format } from "date-fns";
 
 const fmt = (n: number) => new Intl.NumberFormat("id-ID").format(n);
 const fmtCur = (n: number) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
 
-export default function DailyReportsPage() {
+const DAILY_TABS = new Set(["pos", "cash", "stock"]);
+
+function DailyReportsContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const activeTab = tabParam && DAILY_TABS.has(tabParam) ? tabParam : "pos";
+
   const [date, setDate] = useState<string>(format(new Date(), "yyyy-MM-dd"));
-  const [activeTab, setActiveTab] = useState("pos");
   const [posData, setPosData] = useState<any>(null);
   const [cashData, setCashData] = useState<any>(null);
   const [stockData, setStockData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!tabParam || !DAILY_TABS.has(tabParam)) {
+      router.replace("/dashboard/reports/daily?tab=pos");
+    }
+  }, [tabParam, router]);
 
   const loadReport = async (type: "pos" | "cash" | "stock") => {
     setLoading(true);
@@ -55,7 +68,12 @@ export default function DailyReportsPage() {
         </div>
         <Tabs
           activeKey={activeTab}
-          onChange={(k) => { setActiveTab(k); if (k === "pos" && !posData) loadReport("pos"); else if (k === "cash" && !cashData) loadReport("cash"); else if (k === "stock" && !stockData) loadReport("stock"); }}
+          onChange={(k) => {
+            router.replace(`/dashboard/reports/daily?tab=${k}`);
+            if (k === "pos" && !posData) loadReport("pos");
+            else if (k === "cash" && !cashData) loadReport("cash");
+            else if (k === "stock" && !stockData) loadReport("stock");
+          }}
           items={[
             {
               key: "pos",
@@ -172,5 +190,13 @@ export default function DailyReportsPage() {
         />
       </Card>
     </div>
+  );
+}
+
+export default function DailyReportsPage() {
+  return (
+    <Suspense fallback={<div className="space-y-6 p-6 text-muted-foreground">Memuat laporan…</div>}>
+      <DailyReportsContent />
+    </Suspense>
   );
 }

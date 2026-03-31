@@ -475,17 +475,22 @@ export class POSService {
     return { transaction_number: transNum, transaction_id: Number(transaction.id) };
   }
 
-  static async listTransactions(params: {
+  static formatPaymentMethodsLabel(methods: string[]): string {
+    const map: Record<string, string> = {
+      cash: 'Tunai',
+      potong_gaji: 'Potong Gaji',
+      simpanan: 'Simpanan',
+    };
+    const uniq = [...new Set(methods)];
+    return uniq.map((m) => map[m] ?? m).join(', ') || 'Tunai';
+  }
+
+  private static buildTransactionListWhere(params: {
     sessionId?: number;
     memberId?: number;
     fromDate?: string;
     toDate?: string;
-    page?: number;
-    limit?: number;
-  }): Promise<{ transactions: { id: number; transaction_number: string; member_name: string; total_amount: number; payment_method: string; transaction_date: Date }[]; total: number }> {
-    const page = params.page || 1;
-    const limit = params.limit || 20;
-    const skip = (page - 1) * limit;
+  }): Record<string, unknown> {
     const where: Record<string, unknown> = {};
     if (params.sessionId) where.session_id = params.sessionId;
     if (params.memberId) where.member_id = params.memberId;
@@ -495,13 +500,76 @@ export class POSService {
         ...(params.toDate && { lte: new Date(params.toDate + 'T23:59:59') }),
       };
     }
+    return where;
+  }
+
+  static mapRowToTransactionReport(r: {
+    id: bigint;
+    transaction_number: string;
+    transaction_date: Date;
+    subtotal: unknown;
+    discount_amount: unknown | null;
+    total_amount: unknown;
+    member: { member_number?: string | null; name: string };
+    warehouse: { code: string; name: string };
+    pos_payments: { payment_method: string }[];
+  }) {
+    const payMethods = r.pos_payments.length
+      ? r.pos_payments.map((p) => p.payment_method)
+      : ['cash'];
+    return {
+      id: Number(r.id),
+      transaction_number: r.transaction_number,
+      transaction_date: r.transaction_date,
+      member_id: 0,
+      member_number: r.member.member_number ?? null,
+      member_name: r.member.name,
+      warehouse_code: r.warehouse.code,
+      warehouse_name: r.warehouse.name,
+      subtotal: Number(r.subtotal),
+      discount_amount: Number(r.discount_amount ?? 0),
+      total_amount: Number(r.total_amount),
+      payment_methods: POSService.formatPaymentMethodsLabel(payMethods),
+    };
+  }
+
+  static async listTransactions(params: {
+    sessionId?: number;
+    memberId?: number;
+    fromDate?: string;
+    toDate?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<{
+    transactions: {
+      id: number;
+      transaction_number: string;
+      transaction_date: Date;
+      member_id: number;
+      member_number: string | null;
+      member_name: string;
+      warehouse_code: string;
+      warehouse_name: string;
+      subtotal: number;
+      discount_amount: number;
+      total_amount: number;
+      payment_methods: string;
+      payment_method: string;
+    }[];
+    total: number;
+  }> {
+    const page = params.page || 1;
+    const limit = params.limit || 20;
+    const skip = (page - 1) * limit;
+    const where = this.buildTransactionListWhere(params);
 
     const [rows, total] = await Promise.all([
       prisma.pos_transactions.findMany({
         where,
         include: {
-          member: { select: { name: true } },
-          pos_payments: { take: 1, orderBy: { id: 'desc' } },
+          member: { select: { member_number: true, name: true } },
+          warehouse: { select: { code: true, name: true } },
+          pos_payments: { orderBy: { id: 'asc' } },
         },
         orderBy: { transaction_date: 'desc' },
         skip,
@@ -510,15 +578,113 @@ export class POSService {
       prisma.pos_transactions.count({ where }),
     ]);
 
-    const transactions = rows.map((r) => ({
-      id: Number(r.id),
-      transaction_number: r.transaction_number,
-      member_name: r.member.name,
-      total_amount: Number(r.total_amount),
-      payment_method: r.pos_payments[0]?.payment_method ?? 'cash',
-      transaction_date: r.transaction_date,
-    }));
+    const transactions = rows.map((r) => {
+      const base = this.mapRowToTransactionReport({
+        ...r,
+        member: r.member,
+      });
+      const payMethods = r.pos_payments.length
+        ? r.pos_payments.map((p) => p.payment_method)
+        : ['cash'];
+      return {
+        ...base,
+        member_id: Number(r.member_id),
+        payment_method: payMethods[0] ?? 'cash',
+      };
+    });
 
     return { transactions, total };
+  }
+
+  static readonly EXPORT_MAX_ROWS = 50_000;
+
+  static async listTransactionsForExport(params: {
+    memberId?: number;
+    fromDate?: string;
+    toDate?: string;
+  }): Promise<{
+    summary: {
+      id: number;
+      transaction_number: string;
+      transaction_date: Date;
+      member_id: number;
+      member_number: string | null;
+      member_name: string;
+      warehouse_code: string;
+      warehouse_name: string;
+      subtotal: number;
+      discount_amount: number;
+      total_amount: number;
+      payment_methods: string;
+    }[];
+    detailLines: {
+      transaction_number: string;
+      transaction_date: Date;
+      member_name: string;
+      product_code: string;
+      product_name: string;
+      quantity: number;
+      unit_code: string;
+      unit_price: number;
+      line_total: number;
+    }[];
+  }> {
+    const where = this.buildTransactionListWhere(params);
+    const rows = await prisma.pos_transactions.findMany({
+      where,
+      include: {
+        member: { select: { member_number: true, name: true } },
+        warehouse: { select: { code: true, name: true } },
+        pos_payments: { orderBy: { id: 'asc' } },
+        pos_transaction_items: {
+          include: {
+            product: { select: { code: true, name: true } },
+            unit: { select: { code: true } },
+          },
+          orderBy: { id: 'asc' },
+        },
+      },
+      orderBy: { transaction_date: 'desc' },
+      take: this.EXPORT_MAX_ROWS,
+    });
+
+    const summary = rows.map((r) => ({
+      ...this.mapRowToTransactionReport({
+        ...r,
+        member: r.member,
+      }),
+      member_id: Number(r.member_id),
+    }));
+
+    const detailLines: {
+      transaction_number: string;
+      transaction_date: Date;
+      member_name: string;
+      product_code: string;
+      product_name: string;
+      quantity: number;
+      unit_code: string;
+      unit_price: number;
+      line_total: number;
+    }[] = [];
+
+    for (const r of rows) {
+      const memberName = r.member.name;
+      for (const it of r.pos_transaction_items) {
+        detailLines.push({
+          transaction_number: r.transaction_number,
+          transaction_date: r.transaction_date,
+          member_name: memberName,
+          product_code: it.product.code,
+          product_name: it.product.name,
+          quantity: Number(it.quantity),
+          unit_code: it.unit.code,
+          unit_price: Number(it.unit_price),
+          line_total: Number(it.total_amount),
+        });
+      }
+    }
+
+    return { summary, detailLines };
   }
 }

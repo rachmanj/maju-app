@@ -62,7 +62,7 @@ export default function AccountingPage() {
           </Link>
         </Col>
         <Col xs={24} md={12} lg={8}>
-          <Link href="/dashboard/accounting/reports">
+          <Link href="/dashboard/accounting/reports?tab=trial-balance">
             <Card
               hoverable
               className="border-[hsl(var(--border))]"

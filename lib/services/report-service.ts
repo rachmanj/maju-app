@@ -103,35 +103,38 @@ export class ReportService {
     const rows = await prisma.$queryRaw<
       { member_id: number; nik: string; name: string; simpanan_wajib: number; loan_installment: number }[]
     >(Prisma.sql`
-      SELECT m.id as member_id, m.nik, m.name,
-             COALESCE(sw.amount, 0) as simpanan_wajib,
-             COALESCE(loan.installment, 0) as loan_installment
-      FROM members m
-      LEFT JOIN (
-        SELECT sa.member_id, st.minimum_amount as amount
-        FROM savings_accounts sa
-        JOIN savings_types st ON sa.savings_type_id = st.id
-        WHERE st.code = 'WAJIB'
-      ) sw ON sw.member_id = m.id
-      LEFT JOIN (
-        SELECT l.member_id, SUM(ls.installment_amount - ls.paid_amount) as installment
-        FROM loans l
-        JOIN loan_schedules ls ON ls.loan_id = l.id AND ls.status = 'pending'
-        WHERE l.status = 'active' AND ls.due_date BETWEEN ${new Date(startDate)} AND ${new Date(endDate)}
-        GROUP BY l.member_id
-      ) loan ON loan.member_id = m.id
-      WHERE m.status = 'active' AND m.deleted_at IS NULL
-      HAVING COALESCE(sw.amount, 0) > 0 OR COALESCE(loan.installment, 0) > 0
-      ORDER BY m.name
+      SELECT x.member_id, x.nik, x.name, x.simpanan_wajib, x.loan_installment
+      FROM (
+        SELECT m.id as member_id, m.nik, m.name,
+               COALESCE(sw.amount, 0) as simpanan_wajib,
+               COALESCE(loan.installment, 0) as loan_installment
+        FROM members m
+        LEFT JOIN (
+          SELECT sa.member_id, st.minimum_amount as amount
+          FROM savings_accounts sa
+          JOIN savings_types st ON sa.savings_type_id = st.id
+          WHERE st.code = 'WAJIB'
+        ) sw ON sw.member_id = m.id
+        LEFT JOIN (
+          SELECT l.member_id, SUM(ls.installment_amount - ls.paid_amount) as installment
+          FROM loans l
+          JOIN loan_schedules ls ON ls.loan_id = l.id AND ls.status = 'pending'
+          WHERE l.status = 'active' AND ls.due_date BETWEEN ${new Date(startDate)} AND ${new Date(endDate)}
+          GROUP BY l.member_id
+        ) loan ON loan.member_id = m.id
+        WHERE m.status = 'active' AND m.deleted_at IS NULL
+      ) x
+      WHERE x.simpanan_wajib > 0 OR x.loan_installment > 0
+      ORDER BY x.name
     `);
 
     const members = rows.map((r) => {
-      const sw = Number(r.simpanan_wajib || 0);
-      const inst = Number(r.loan_installment || 0);
+      const sw = Number(r.simpanan_wajib ?? 0);
+      const inst = Number(r.loan_installment ?? 0);
       return {
-        member_id: r.member_id,
-        nik: r.nik,
-        name: r.name,
+        member_id: Number(r.member_id),
+        nik: String(r.nik ?? ""),
+        name: String(r.name ?? ""),
         simpanan_wajib: sw,
         loan_installment: inst,
         total: sw + inst,

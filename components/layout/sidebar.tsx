@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useMemo } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Menu, Button } from "antd";
 import type { MenuProps } from "antd";
 import {
@@ -27,6 +27,29 @@ import { useSidebar } from "@/lib/hooks/use-sidebar";
 import { useSession } from "next-auth/react";
 import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
 
+function flattenMenuKeys(items: MenuProps["items"]): string[] {
+  const keys: string[] = [];
+  function walk(nodes: MenuProps["items"]) {
+    for (const node of nodes ?? []) {
+      if (!node) continue;
+      if ("children" in node && node.children) {
+        for (const ch of node.children) {
+          if (!ch) continue;
+          if ("children" in ch && ch.children) {
+            walk(ch.children as MenuProps["items"]);
+          } else if ("key" in ch && typeof ch.key === "string") {
+            keys.push(ch.key);
+          }
+        }
+      } else if ("key" in node && typeof node.key === "string") {
+        keys.push(node.key);
+      }
+    }
+  }
+  walk(items);
+  return keys;
+}
+
 function useMenuItems(): MenuProps["items"] {
   const { data: session } = useSession();
   const roles = (session?.user as { roles?: string[] })?.roles ?? [];
@@ -46,12 +69,33 @@ function useMenuItems(): MenuProps["items"] {
     { key: "/dashboard/accounting", label: "Akuntansi", icon: <AccountBookOutlined /> },
     { key: "/dashboard/inventory", label: "Inventory", icon: <InboxOutlined /> },
     { key: "/dashboard/inventory/consignment", label: "Konsinyasi", icon: <TruckOutlined /> },
-    { key: "/dashboard/pos", label: "POS", icon: <ShoppingCartOutlined /> },
+    {
+      key: "sub-pos",
+      label: "POS",
+      icon: <ShoppingCartOutlined />,
+      children: [
+        { key: "/dashboard/pos", label: "Kasir" },
+        { key: "/dashboard/pos/laporan-transaksi", label: "Laporan Transaksi" },
+      ],
+    },
     { key: "/dashboard/receivables", label: "Piutang", icon: <DollarOutlined /> },
     { key: "/dashboard/expenses", label: "Pengeluaran", icon: <DollarOutlined /> },
     { key: "/dashboard/orders", label: "Pesanan", icon: <ShoppingOutlined /> },
-    { key: "/dashboard/accounting/reports", label: "Laporan", icon: <FileTextOutlined /> },
-    { key: "/dashboard/reports/daily", label: "Laporan Harian", icon: <FileTextOutlined /> },
+    {
+      key: "sub-laporan",
+      label: "Laporan",
+      icon: <FileTextOutlined />,
+      children: [
+        { key: "/dashboard/accounting/reports?tab=trial-balance", label: "Trial Balance" },
+        { key: "/dashboard/accounting/reports?tab=general-ledger", label: "Buku Besar" },
+        { key: "/dashboard/accounting/reports?tab=payroll-deduction", label: "Potongan Gaji" },
+        { key: "/dashboard/accounting/reports?tab=balance-sheet", label: "Neraca" },
+        { key: "/dashboard/accounting/reports?tab=profit-loss", label: "Laba Rugi" },
+        { key: "/dashboard/reports/daily?tab=pos", label: "Penjualan POS" },
+        { key: "/dashboard/reports/daily?tab=cash", label: "Kas Harian" },
+        { key: "/dashboard/reports/daily?tab=stock", label: "Mutasi Stok" },
+      ],
+    },
     ...(showAudit
       ? [{ key: "/dashboard/audit-logs", label: "Audit Log", icon: <AuditOutlined /> }]
       : []),
@@ -67,6 +111,7 @@ function useMenuItems(): MenuProps["items"] {
 
 export function Sidebar() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const { isCollapsed, toggle } = useSidebar();
   const menuItems = useMenuItems();
@@ -87,16 +132,33 @@ export function Sidebar() {
     router.push(e.key);
   };
 
+  const fullPath = useMemo(() => {
+    const q = searchParams.toString();
+    return q ? `${pathname}?${q}` : pathname;
+  }, [pathname, searchParams]);
+
   const selectedKey = (() => {
-    const exact = (menuItems ?? []).find(item => item?.key === pathname)?.key;
-    if (exact) return exact as string;
-    const prefixMatches = (menuItems ?? [])
-      .filter((item): item is NonNullable<typeof item> & { key: string } =>
-        item != null && typeof item.key === 'string' && pathname.startsWith(item.key + "/")
-      )
-      .sort((a, b) => (b.key.length - a.key.length));
-    return (prefixMatches[0]?.key ?? pathname) as string;
+    const flatKeys = flattenMenuKeys(menuItems);
+    if (flatKeys.includes(fullPath)) return fullPath;
+    if (flatKeys.includes(pathname)) return pathname;
+    const prefixMatches = flatKeys
+      .filter((k) => {
+        const base = k.split("?")[0];
+        return pathname === base || pathname.startsWith(base + "/");
+      })
+      .sort((a, b) => b.length - a.length);
+    return (prefixMatches[0] ?? fullPath) as string;
   })();
+
+  const laporanOpenKeys = useMemo(() => {
+    if (
+      pathname.startsWith("/dashboard/accounting/reports") ||
+      pathname.startsWith("/dashboard/reports/daily")
+    ) {
+      return ["sub-laporan"];
+    }
+    return [];
+  }, [pathname]);
 
   return (
     <aside
@@ -116,7 +178,7 @@ export function Sidebar() {
           type="text"
           icon={isCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
           onClick={toggle}
-          className="!text-[hsl(var(--sidebar-foreground))]/80 hover:!text-white shrink-0"
+          className="text-[hsl(var(--sidebar-foreground))]/80! hover:text-white! shrink-0"
           aria-label={isCollapsed ? "Expand menu" : "Collapse menu"}
         />
       </div>
@@ -124,10 +186,17 @@ export function Sidebar() {
         <Menu
           mode="inline"
           selectedKeys={[selectedKey]}
+          openKeys={
+            pathname.startsWith("/dashboard/pos")
+              ? ["sub-pos"]
+              : laporanOpenKeys.length > 0
+                ? laporanOpenKeys
+                : []
+          }
           items={menuItems}
           onClick={handleMenuClick}
           inlineCollapsed={isCollapsed}
-          className="!border-0 !bg-transparent [&_.ant-menu-item]:!mx-2 [&_.ant-menu-item]:!rounded-lg [&_.ant-menu-item-selected]:!bg-teal-500/20 [&_.ant-menu-item-selected]:!text-teal-400 [&_.ant-menu-item]:!text-[hsl(var(--sidebar-foreground))]/80 [&_.ant-menu-item:hover]:!text-white [&_.ant-menu-item]:!h-11"
+          className="border-0! bg-transparent! [&_.ant-menu-item]:mx-2! [&_.ant-menu-item]:rounded-lg! [&_.ant-menu-item-selected]:bg-teal-500/20! [&_.ant-menu-item-selected]:text-teal-400! [&_.ant-menu-item]:text-[hsl(var(--sidebar-foreground))]/80! [&_.ant-menu-item:hover]:text-white! [&_.ant-menu-item]:h-11! [&_.ant-menu-submenu-title]:mx-2! [&_.ant-menu-submenu-title]:rounded-lg! [&_.ant-menu-submenu-selected>.ant-menu-submenu-title]:text-teal-400!"
           style={{ background: "transparent" }}
         />
       </div>

@@ -1,15 +1,29 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Card, Table, DatePicker, Select, Button, Tabs, Space } from "antd";
 import { App } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { format } from "date-fns";
 
-export default function ReportsPage() {
+const REPORT_TABS = new Set([
+  "trial-balance",
+  "general-ledger",
+  "payroll-deduction",
+  "balance-sheet",
+  "profit-loss",
+]);
+
+function AccountingReportsContent() {
   const { message } = App.useApp();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const activeTab =
+    tabParam && REPORT_TABS.has(tabParam) ? tabParam : "trial-balance";
+
   const [coa, setCoa] = useState<{ id: number; code: string; name: string }[]>([]);
-  const [activeTab, setActiveTab] = useState("trial-balance");
   const [fromDate, setFromDate] = useState<string>(
     format(new Date(new Date().getFullYear(), 0, 1), "yyyy-MM-dd")
   );
@@ -30,6 +44,12 @@ export default function ReportsPage() {
       .then(setCoa)
       .catch(() => message.error("Gagal memuat COA"));
   }, []);
+
+  useEffect(() => {
+    if (!tabParam || !REPORT_TABS.has(tabParam)) {
+      router.replace("/dashboard/accounting/reports?tab=trial-balance");
+    }
+  }, [tabParam, router]);
 
   const loadTrialBalance = async () => {
     try {
@@ -142,7 +162,7 @@ export default function ReportsPage() {
       <Card>
         <Tabs
           activeKey={activeTab}
-          onChange={setActiveTab}
+          onChange={(key) => router.replace(`/dashboard/accounting/reports?tab=${key}`)}
           items={[
             {
               key: "trial-balance",
@@ -441,5 +461,13 @@ export default function ReportsPage() {
         />
       </Card>
     </div>
+  );
+}
+
+export default function ReportsPage() {
+  return (
+    <Suspense fallback={<div className="space-y-6 p-6 text-muted-foreground">Memuat laporan…</div>}>
+      <AccountingReportsContent />
+    </Suspense>
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import { SessionProvider } from "@/components/providers/session-provider";
 import { DashboardRedirect } from "@/components/auth/dashboard-redirect";
 import { Sidebar } from "@/components/layout/sidebar";
@@ -32,7 +33,9 @@ export default function DashboardLayout({
     <SessionProvider>
       <DashboardRedirect>
         <div className="flex h-screen overflow-hidden bg-[hsl(var(--background))]">
-          <Sidebar />
+          <Suspense fallback={<aside className="fixed left-0 top-0 z-40 h-screen w-64 shrink-0 bg-[hsl(var(--sidebar-bg))]" />}>
+            <Sidebar />
+          </Suspense>
           <DashboardContent>{children}</DashboardContent>
         </div>
       </DashboardRedirect>
