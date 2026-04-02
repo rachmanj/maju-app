@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db/prisma';
 import type { Loan, LoanApplication, LoanSchedule } from '@/types/database';
 import { LoanCalculator } from '../utils/loan-calculator';
@@ -232,18 +233,48 @@ export class LoanService {
     limit?: number;
     member_id?: number;
     status?: string;
+    member_search?: string;
+    project_id?: number;
   }): Promise<{ loans: Loan[]; total: number }> {
     const page = params.page || 1;
     const limit = params.limit || 20;
     const skip = (page - 1) * limit;
-    const where: Record<string, unknown> = {};
-    if (params.member_id != null) where.member_id = params.member_id;
+    const where: Prisma.loansWhereInput = {};
+
+    if (params.member_id != null) {
+      where.member_id = params.member_id;
+    } else {
+      const search = params.member_search?.trim();
+      const projectId = params.project_id;
+      const memberFilter: Prisma.membersWhereInput = { deleted_at: null };
+      if (projectId != null && projectId > 0) {
+        memberFilter.project_id = projectId;
+      }
+      if (search) {
+        memberFilter.OR = [
+          { name: { contains: search } },
+          { nik: { contains: search } },
+          { member_number: { contains: search } },
+        ];
+      }
+      where.member = memberFilter;
+    }
+
     if (params.status) where.status = params.status;
 
     const [loans, total] = await Promise.all([
       prisma.loans.findMany({
         where,
-        include: { member: { select: { name: true, nik: true } } },
+        include: {
+          member: {
+            select: {
+              name: true,
+              nik: true,
+              member_number: true,
+              project: { select: { id: true, code: true, name: true } },
+            },
+          },
+        },
         orderBy: { created_at: 'desc' },
         skip,
         take: limit,
@@ -268,6 +299,9 @@ export class LoanService {
       created_by: l.created_by != null ? Number(l.created_by) : null,
       member_name: l.member.name,
       member_nik: l.member.nik,
+      member_number: l.member.member_number ?? null,
+      project_code: l.member.project?.code ?? null,
+      project_name: l.member.project?.name ?? null,
     }));
     return { loans: list as unknown as Loan[], total };
   }

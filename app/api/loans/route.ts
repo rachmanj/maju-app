@@ -15,8 +15,19 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '20');
     const member_id = searchParams.get('member_id') ? parseInt(searchParams.get('member_id')!) : undefined;
     const status = searchParams.get('status') || undefined;
+    const member_search = searchParams.get('q') || searchParams.get('member_search') || undefined;
+    const project_id_raw = searchParams.get('project_id');
+    const project_id =
+      project_id_raw != null && project_id_raw !== '' ? parseInt(project_id_raw, 10) : undefined;
 
-    const result = await LoanService.listLoans({ page, limit, member_id, status });
+    const result = await LoanService.listLoans({
+      page,
+      limit,
+      member_id,
+      status,
+      member_search: member_search ?? undefined,
+      project_id: project_id != null && !isNaN(project_id) ? project_id : undefined,
+    });
     return NextResponse.json(result);
   } catch (error: any) {
     console.error('Error fetching loans:', error);

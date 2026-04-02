@@ -15,6 +15,7 @@ const navItems = [
   { href: "/member/savings", label: "Simpanan" },
   { href: "/member/loans", label: "Pinjaman" },
   { href: "/member/transactions", label: "Transaksi" },
+  { href: "/member/pos-transactions", label: "Belanja POS" },
   { href: "/member/orders", label: "Pesanan" },
 ];
 
@@ -64,19 +65,24 @@ export function MemberPortalNav() {
           Koperasi Maju
         </Link>
         <nav className="flex items-center gap-1">
-          {navItems.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                pathname === item.href
-                  ? "bg-teal-500/15 text-teal-600"
-                  : "text-[hsl(var(--foreground))]/80 hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]"
-              }`}
-            >
-              {item.label}
-            </Link>
-          ))}
+          {navItems.map((item) => {
+            const active =
+              pathname === item.href ||
+              (item.href !== "/member/dashboard" && pathname.startsWith(`${item.href}/`));
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                  active
+                    ? "bg-teal-500/15 text-teal-600"
+                    : "text-[hsl(var(--foreground))]/80 hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]"
+                }`}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
         </nav>
         <Dropdown menu={{ items: menuItems }} placement="bottomRight" trigger={["click"]}>
           <Button type="text" className="!flex !h-9 !w-9 !items-center !justify-center !rounded-full !p-0">

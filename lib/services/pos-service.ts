@@ -687,4 +687,82 @@ export class POSService {
 
     return { summary, detailLines };
   }
+
+  static async getMemberTransactionDetail(
+    memberId: number,
+    transactionId: number
+  ): Promise<{
+    id: number;
+    transaction_number: string;
+    transaction_date: string;
+    warehouse_name: string;
+    warehouse_code: string;
+    subtotal: number;
+    discount_amount: number;
+    total_amount: number;
+    notes: string | null;
+    payment_methods: string;
+    items: {
+      id: number;
+      product_code: string;
+      product_name: string;
+      quantity: number;
+      unit_code: string;
+      unit_price: number;
+      discount_amount: number;
+      total_amount: number;
+    }[];
+    payments: { payment_method: string; amount: number }[];
+  } | null> {
+    const row = await prisma.pos_transactions.findFirst({
+      where: {
+        id: BigInt(transactionId),
+        member_id: BigInt(memberId),
+      },
+      include: {
+        warehouse: { select: { name: true, code: true } },
+        pos_payments: { orderBy: { id: 'asc' } },
+        pos_transaction_items: {
+          include: {
+            product: { select: { code: true, name: true } },
+            unit: { select: { code: true } },
+          },
+          orderBy: { id: 'asc' },
+        },
+      },
+    });
+    if (!row) return null;
+
+    const payMethods = row.pos_payments.length
+      ? row.pos_payments.map((p) => p.payment_method)
+      : ['cash'];
+    const payment_methods = this.formatPaymentMethodsLabel(payMethods);
+
+    return {
+      id: Number(row.id),
+      transaction_number: row.transaction_number,
+      transaction_date: row.transaction_date.toISOString(),
+      warehouse_name: row.warehouse.name,
+      warehouse_code: row.warehouse.code,
+      subtotal: Number(row.subtotal),
+      discount_amount: Number(row.discount_amount ?? 0),
+      total_amount: Number(row.total_amount),
+      notes: row.notes ?? null,
+      payment_methods,
+      items: row.pos_transaction_items.map((it) => ({
+        id: Number(it.id),
+        product_code: it.product.code,
+        product_name: it.product.name,
+        quantity: Number(it.quantity),
+        unit_code: it.unit.code,
+        unit_price: Number(it.unit_price),
+        discount_amount: Number(it.discount_amount ?? 0),
+        total_amount: Number(it.total_amount),
+      })),
+      payments: row.pos_payments.map((p) => ({
+        payment_method: p.payment_method,
+        amount: Number(p.amount),
+      })),
+    };
+  }
 }
