@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Menu, Button } from "antd";
 import type { MenuProps } from "antd";
@@ -129,6 +129,7 @@ export function Sidebar() {
   }, [isCollapsed, toggle]);
 
   const handleMenuClick: MenuProps["onClick"] = (e) => {
+    if (e.key === "sub-pos" || e.key === "sub-laporan") return;
     router.push(e.key);
   };
 
@@ -150,14 +151,33 @@ export function Sidebar() {
     return (prefixMatches[0] ?? fullPath) as string;
   })();
 
-  const laporanOpenKeys = useMemo(() => {
-    if (
-      pathname.startsWith("/dashboard/accounting/reports") ||
-      pathname.startsWith("/dashboard/reports/daily")
-    ) {
-      return ["sub-laporan"];
-    }
-    return [];
+  const [openKeys, setOpenKeys] = useState<string[]>([]);
+
+  useEffect(() => {
+    setOpenKeys((prev) => {
+      const keep = prev.filter((key) => {
+        if (key === "sub-pos") {
+          return pathname === "/dashboard" || pathname.startsWith("/dashboard/pos");
+        }
+        if (key === "sub-laporan") {
+          return (
+            pathname === "/dashboard" ||
+            pathname.startsWith("/dashboard/accounting/reports") ||
+            pathname.startsWith("/dashboard/reports/daily")
+          );
+        }
+        return false;
+      });
+      const add: string[] = [];
+      if (pathname.startsWith("/dashboard/pos")) add.push("sub-pos");
+      if (
+        pathname.startsWith("/dashboard/accounting/reports") ||
+        pathname.startsWith("/dashboard/reports/daily")
+      ) {
+        add.push("sub-laporan");
+      }
+      return [...new Set([...keep, ...add])];
+    });
   }, [pathname]);
 
   return (
@@ -186,13 +206,8 @@ export function Sidebar() {
         <Menu
           mode="inline"
           selectedKeys={[selectedKey]}
-          openKeys={
-            pathname.startsWith("/dashboard/pos")
-              ? ["sub-pos"]
-              : laporanOpenKeys.length > 0
-                ? laporanOpenKeys
-                : []
-          }
+          openKeys={openKeys}
+          onOpenChange={setOpenKeys}
           items={menuItems}
           onClick={handleMenuClick}
           inlineCollapsed={isCollapsed}
