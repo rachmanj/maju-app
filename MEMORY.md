@@ -1,5 +1,5 @@
 **Purpose**: AI's persistent knowledge base for project context and learnings
-**Last Updated**: 2026-03-20
+**Last Updated**: 2026-04-05
 
 ## Memory Maintenance Guidelines
 
@@ -26,6 +26,22 @@
 ---
 
 ## Project Memory Entries
+
+### [033] Loan balance Excel export, list filters, dashboard loan stats (2026-04-05) ✅ COMPLETE
+
+**Challenge**: Export saldo pinjaman per anggota/pinjaman; filter daftar by anggota & proyek; align dashboard “Pinjaman Aktif” with real disbursed loans (`approved`).
+
+**Solution**:
+- **Export**: `GET /api/loans/export/balance` (LOAN_VIEW); sheets Per Pinjaman & Rekap Per Anggota; sisa pokok from payments; sisa jadwal from schedules; max 50k rows; UI “Ekspor Excel” on loans table (uses same `q`/`project_id` as filters).
+- **List API**: `LoanService.loansWhereFromListParams` shared by `listLoans` and export; query `q`, `project_id`.
+- **Dashboard**: `ACTIVE_LOAN_STATUSES` = approved, disbursed, active for count/sum pokok.
+- **Member portal**: `GET /api/member-portal/loans/[id]` full loan + schedules for parity with staff detail.
+
+**Key Learning**: Reuse one `where` builder for list and export so filtered Excel matches on-screen data.
+
+**Files**: lib/services/loan-service.ts, app/api/loans/export/balance/route.ts, app/api/loans/route.ts, components/loans/loans-table.tsx, app/(dashboard)/dashboard/page.tsx, app/api/member-portal/loans/[id]/route.ts
+
+---
 
 ### [032] Konsinyasi API BigInt + Penjualan DatePicker (2026-03-20) ✅ COMPLETE
 

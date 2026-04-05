@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Button, Table, Badge, Space, App, Modal, Input, Select, Row, Col } from "antd";
-import { EyeOutlined, DeleteOutlined, SearchOutlined } from "@ant-design/icons";
+import { EyeOutlined, DeleteOutlined, SearchOutlined, FileExcelOutlined } from "@ant-design/icons";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
@@ -252,14 +252,28 @@ export function LoansTable() {
           />
         </Col>
         <Col xs={24} lg={4}>
-          <Button
-            onClick={() => {
-              setMemberSearch("");
-              setProjectId(undefined);
-            }}
-          >
-            Reset filter
-          </Button>
+          <Space wrap>
+            <Button
+              icon={<FileExcelOutlined />}
+              onClick={() => {
+                const params = new URLSearchParams();
+                if (debouncedSearch) params.set("q", debouncedSearch);
+                if (projectId != null && projectId > 0) params.set("project_id", String(projectId));
+                const q = params.toString();
+                window.open(`/api/loans/export/balance${q ? `?${q}` : ""}`, "_blank");
+              }}
+            >
+              Ekspor Excel
+            </Button>
+            <Button
+              onClick={() => {
+                setMemberSearch("");
+                setProjectId(undefined);
+              }}
+            >
+              Reset filter
+            </Button>
+          </Space>
         </Col>
       </Row>
       <Table

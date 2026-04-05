@@ -228,19 +228,13 @@ export class LoanService {
     };
   }
 
-  static async listLoans(params: {
-    page?: number;
-    limit?: number;
+  static loansWhereFromListParams(params: {
     member_id?: number;
     status?: string;
     member_search?: string;
     project_id?: number;
-  }): Promise<{ loans: Loan[]; total: number }> {
-    const page = params.page || 1;
-    const limit = params.limit || 20;
-    const skip = (page - 1) * limit;
+  }): Prisma.loansWhereInput {
     const where: Prisma.loansWhereInput = {};
-
     if (params.member_id != null) {
       where.member_id = params.member_id;
     } else {
@@ -259,8 +253,22 @@ export class LoanService {
       }
       where.member = memberFilter;
     }
-
     if (params.status) where.status = params.status;
+    return where;
+  }
+
+  static async listLoans(params: {
+    page?: number;
+    limit?: number;
+    member_id?: number;
+    status?: string;
+    member_search?: string;
+    project_id?: number;
+  }): Promise<{ loans: Loan[]; total: number }> {
+    const page = params.page || 1;
+    const limit = params.limit || 20;
+    const skip = (page - 1) * limit;
+    const where = this.loansWhereFromListParams(params);
 
     const [loans, total] = await Promise.all([
       prisma.loans.findMany({
@@ -556,5 +564,156 @@ export class LoanService {
     });
 
     return { loanId: Number(loan.id), loanNumber: loan.loan_number };
+  }
+
+  static readonly LOAN_BALANCE_EXPORT_MAX_ROWS = 50_000;
+
+  static async listLoanBalanceExport(params: {
+    member_search?: string;
+    project_id?: number;
+  }): Promise<{
+    detail: Array<{
+      member_number: string;
+      member_name: string;
+      member_nik: string | null;
+      project_code: string | null;
+      project_name: string | null;
+      loan_number: string;
+      loan_status: string | null;
+      principal_amount: number;
+      principal_paid: number;
+      principal_outstanding: number;
+      interest_paid: number;
+      remaining_schedule_amount: number;
+      approved_date: Date | null;
+      disbursed_date: Date | null;
+    }>;
+    byMember: Array<{
+      member_number: string;
+      member_name: string;
+      member_nik: string | null;
+      project_code: string | null;
+      project_name: string | null;
+      loan_count: number;
+      total_principal: number;
+      total_principal_paid: number;
+      total_principal_outstanding: number;
+      total_remaining_schedule: number;
+    }>;
+  }> {
+    const where = this.loansWhereFromListParams({
+      member_search: params.member_search,
+      project_id: params.project_id,
+    });
+    const loans = await prisma.loans.findMany({
+      where,
+      include: {
+        member: {
+          select: {
+            member_number: true,
+            name: true,
+            nik: true,
+            project: { select: { code: true, name: true } },
+          },
+        },
+      },
+      orderBy: [{ member_id: 'asc' }, { id: 'asc' }],
+      take: this.LOAN_BALANCE_EXPORT_MAX_ROWS,
+    });
+    if (loans.length === 0) {
+      return { detail: [], byMember: [] };
+    }
+    const loanIds = loans.map((l) => l.id);
+    const [paymentAgg, scheduleRows] = await Promise.all([
+      prisma.loan_payments.groupBy({
+        by: ['loan_id'],
+        where: { loan_id: { in: loanIds } },
+        _sum: { principal_amount: true, interest_amount: true },
+      }),
+      prisma.loan_schedules.findMany({
+        where: { loan_id: { in: loanIds } },
+        select: { loan_id: true, installment_amount: true, paid_amount: true },
+      }),
+    ]);
+    const payMap = new Map(
+      paymentAgg.map((p) => [
+        Number(p.loan_id),
+        {
+          principal: Number(p._sum.principal_amount ?? 0),
+          interest: Number(p._sum.interest_amount ?? 0),
+        },
+      ])
+    );
+    const scheduleRemainMap = new Map<number, number>();
+    for (const s of scheduleRows) {
+      const lid = Number(s.loan_id);
+      const rem = Math.max(0, Number(s.installment_amount) - Number(s.paid_amount ?? 0));
+      scheduleRemainMap.set(lid, (scheduleRemainMap.get(lid) ?? 0) + rem);
+    }
+    const detail = loans.map((loan) => {
+      const paid = payMap.get(Number(loan.id)) ?? { principal: 0, interest: 0 };
+      const pokok = Number(loan.principal_amount);
+      const principalPaid = paid.principal;
+      const principalOutstanding = Math.max(0, pokok - principalPaid);
+      return {
+        member_number: loan.member.member_number,
+        member_name: loan.member.name,
+        member_nik: loan.member.nik,
+        project_code: loan.member.project?.code ?? null,
+        project_name: loan.member.project?.name ?? null,
+        loan_number: loan.loan_number,
+        loan_status: loan.status,
+        principal_amount: pokok,
+        principal_paid: principalPaid,
+        principal_outstanding: principalOutstanding,
+        interest_paid: paid.interest,
+        remaining_schedule_amount: scheduleRemainMap.get(Number(loan.id)) ?? 0,
+        approved_date: loan.approved_date,
+        disbursed_date: loan.disbursed_date,
+      };
+    });
+    const memberMap = new Map<
+      string,
+      {
+        member_number: string;
+        member_name: string;
+        member_nik: string | null;
+        project_code: string | null;
+        project_name: string | null;
+        loan_count: number;
+        total_principal: number;
+        total_principal_paid: number;
+        total_principal_outstanding: number;
+        total_remaining_schedule: number;
+      }
+    >();
+    for (const row of detail) {
+      const key = row.member_number;
+      const existing = memberMap.get(key);
+      if (!existing) {
+        memberMap.set(key, {
+          member_number: row.member_number,
+          member_name: row.member_name,
+          member_nik: row.member_nik,
+          project_code: row.project_code,
+          project_name: row.project_name,
+          loan_count: 1,
+          total_principal: row.principal_amount,
+          total_principal_paid: row.principal_paid,
+          total_principal_outstanding: row.principal_outstanding,
+          total_remaining_schedule: row.remaining_schedule_amount,
+        });
+      } else {
+        existing.loan_count += 1;
+        existing.total_principal += row.principal_amount;
+        existing.total_principal_paid += row.principal_paid;
+        existing.total_principal_outstanding += row.principal_outstanding;
+        existing.total_remaining_schedule += row.remaining_schedule_amount;
+      }
+    }
+    const byMember = Array.from(memberMap.values()).sort((a, b) =>
+      a.member_number.localeCompare(b.member_number, 'id')
+    );
+    return { detail, byMember };
   }
 }
