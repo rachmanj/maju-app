@@ -649,15 +649,18 @@ model warehouses {
 }
 
 model pos_self_service_devices {
-  id           BigInt    @id @default(autoincrement())
-  ip_address   String    @unique @db.VarChar(45)
-  name         String?   @db.VarChar(255)
-  warehouse_id BigInt
-  is_active    Boolean?  @default(true)
-  created_at   DateTime? @default(now()) @db.Timestamp(0)
-  updated_at   DateTime? @default(now()) @updatedAt @db.Timestamp(0)
-  warehouse    warehouses @relation(fields: [warehouse_id], references: [id], onDelete: Cascade)
-  @@index([ip_address])
+  id                 BigInt    @id @default(autoincrement())
+  device_token       String?   @unique @db.VarChar(64)
+  pairing_code       String?   @db.VarChar(10)
+  pairing_expires_at DateTime? @db.DateTime(0)
+  name               String?   @db.VarChar(255)
+  warehouse_id       BigInt
+  is_active          Boolean?  @default(true)
+  created_at         DateTime? @default(now()) @db.Timestamp(0)
+  updated_at         DateTime? @default(now()) @updatedAt @db.Timestamp(0)
+  warehouse          warehouses @relation(fields: [warehouse_id], references: [id], onDelete: Cascade)
+  @@index([device_token])
+  @@index([pairing_code])
   @@index([warehouse_id])
   @@map("pos_self_service_devices")
 }

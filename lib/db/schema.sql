@@ -749,14 +749,17 @@ CREATE TABLE IF NOT EXISTS pos_devices (
 
 CREATE TABLE IF NOT EXISTS pos_self_service_devices (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    ip_address VARCHAR(45) UNIQUE NOT NULL,
+    device_token VARCHAR(64) UNIQUE NULL,
+    pairing_code VARCHAR(10) NULL,
+    pairing_expires_at DATETIME NULL,
     name VARCHAR(255),
     warehouse_id BIGINT NOT NULL,
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (warehouse_id) REFERENCES warehouses(id) ON DELETE CASCADE,
-    INDEX idx_ip_address (ip_address),
+    INDEX idx_device_token (device_token),
+    INDEX idx_pairing_code (pairing_code),
     INDEX idx_warehouse_id (warehouse_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

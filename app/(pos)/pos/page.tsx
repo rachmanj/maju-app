@@ -42,14 +42,18 @@ const formatCurrency = (n: number) =>
     minimumFractionDigits: 0,
   }).format(n);
 
+const POS_DEVICE_TOKEN_KEY = "pos_device_token";
+
 type AccessState =
   | { status: "loading" }
-  | { status: "denied"; message?: string; detectedIp?: string }
+  | { status: "unpaired" }
+  | { status: "denied"; message?: string }
   | { status: "allowed"; warehouseId: number; warehouseName: string };
 
 export default function POSSelfServicePage() {
   const { data: session, status: sessionStatus } = useSession();
   const [access, setAccess] = useState<AccessState>({ status: "loading" });
+  const [deviceToken, setDeviceToken] = useState<string | null>(null);
   const [warehouseId, setWarehouseId] = useState<number | null>(null);
   const [sessionId, setSessionId] = useState<number | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -59,16 +63,26 @@ export default function POSSelfServicePage() {
   const [pin, setPin] = useState("");
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [loginForm] = Form.useForm();
+  const [pairingForm] = Form.useForm();
   const [loginLoading, setLoginLoading] = useState(false);
+  const [pairingLoading, setPairingLoading] = useState(false);
 
   const memberId = (session?.user as { memberId?: number | null })?.memberId ?? null;
   const memberName = session?.user?.name ?? "Anggota";
   const roles = (session?.user as { roles?: string[] })?.roles ?? [];
   const isAnggota = roles.includes("anggota");
 
-  const checkAccess = useCallback(async () => {
+  const checkAccess = useCallback(async (token?: string | null) => {
+    const activeToken = token ?? deviceToken ?? localStorage.getItem(POS_DEVICE_TOKEN_KEY);
+    if (!activeToken) {
+      setAccess({ status: "unpaired" });
+      return;
+    }
+
     try {
-      const res = await fetch("/api/pos-public/check-access");
+      const res = await fetch("/api/pos-public/check-access", {
+        headers: { "X-Device-Token": activeToken },
+      });
       const data = await res.json();
       if (data.allowed && data.warehouseId) {
         setAccess({
@@ -77,17 +91,20 @@ export default function POSSelfServicePage() {
           warehouseName: data.warehouseName || data.warehouseCode || "Gudang",
         });
         setWarehouseId(data.warehouseId);
+      } else if (data.unpaired) {
+        localStorage.removeItem(POS_DEVICE_TOKEN_KEY);
+        setDeviceToken(null);
+        setAccess({ status: "unpaired" });
       } else {
         setAccess({
           status: "denied",
-          message: data.message || "IP tidak terdaftar untuk POS Self-Service",
-          detectedIp: data.detectedIp,
+          message: data.message || "Akses POS Self-Service ditolak",
         });
       }
     } catch {
-      setAccess({ status: "denied", message: "Gagal memeriksa akses", detectedIp: "unknown" });
+      setAccess({ status: "denied", message: "Gagal memeriksa akses" });
     }
-  }, []);
+  }, [deviceToken]);
 
   const fetchSession = useCallback(async () => {
     try {
@@ -102,8 +119,32 @@ export default function POSSelfServicePage() {
   }, []);
 
   useEffect(() => {
-    checkAccess();
+    const storedToken = localStorage.getItem(POS_DEVICE_TOKEN_KEY);
+    setDeviceToken(storedToken);
+    checkAccess(storedToken);
   }, [checkAccess]);
+
+  const handlePair = async (values: { code: string }) => {
+    setPairingLoading(true);
+    try {
+      const res = await fetch("/api/pos-public/pair", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: values.code.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Gagal memasangkan device");
+
+      localStorage.setItem(POS_DEVICE_TOKEN_KEY, data.device_token);
+      setDeviceToken(data.device_token);
+      message.success("Device berhasil dipasangkan");
+      await checkAccess(data.device_token);
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : "Gagal memasangkan device");
+    } finally {
+      setPairingLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (access.status === "allowed" && memberId) fetchSession();
@@ -269,20 +310,58 @@ export default function POSSelfServicePage() {
     );
   }
 
+  if (access.status === "unpaired") {
+    return (
+      <div className="flex min-h-screen items-center justify-center p-4">
+        <Card className="w-full max-w-md" title={<h1 className="mb-0 text-2xl font-bold">Pasangkan Device</h1>}>
+          <p className="mb-6 text-muted-foreground">
+            Masukkan kode pairing 6 digit dari Pengaturan → POS Self-Service.
+          </p>
+          <Form form={pairingForm} layout="vertical" onFinish={handlePair} size="large">
+            <Form.Item
+              name="code"
+              label="Kode Pairing"
+              rules={[
+                { required: true, message: "Kode pairing wajib diisi" },
+                { pattern: /^\d{6}$/, message: "Kode harus 6 digit angka" },
+              ]}
+            >
+              <Input
+                placeholder="123456"
+                maxLength={6}
+                inputMode="numeric"
+                className="text-center font-mono text-2xl tracking-widest"
+                disabled={pairingLoading}
+              />
+            </Form.Item>
+            <Form.Item>
+              <Button type="primary" htmlType="submit" block loading={pairingLoading}>
+                Pasangkan
+              </Button>
+            </Form.Item>
+          </Form>
+        </Card>
+      </div>
+    );
+  }
+
   if (access.status === "denied") {
-    const detectedIp = access.detectedIp ?? "tidak terdeteksi";
     return (
       <div className="flex min-h-screen items-center justify-center p-4">
         <Card className="w-full max-w-md" title="Akses Ditolak">
-          <p className="text-muted-foreground">
-            {access.message}
-          </p>
-          <p className="mt-4 font-mono rounded bg-muted px-3 py-2 text-sm">
-            IP terdeteksi: <strong>{detectedIp}</strong>
-          </p>
-          <p className="mt-4 text-sm text-muted-foreground">
-            Daftarkan IP di atas di Pengaturan → POS Self-Service.
-          </p>
+          <p className="text-muted-foreground">{access.message}</p>
+          <Button
+            className="mt-4"
+            type="primary"
+            block
+            onClick={() => {
+              localStorage.removeItem(POS_DEVICE_TOKEN_KEY);
+              setDeviceToken(null);
+              setAccess({ status: "unpaired" });
+            }}
+          >
+            Pasangkan Ulang
+          </Button>
         </Card>
       </div>
     );

@@ -14,9 +14,8 @@ export async function PATCH(
     }
     const { id } = await params;
     const body = await request.json();
-    const { ip_address, name, warehouse_id, is_active } = body;
+    const { name, warehouse_id, is_active } = body;
     await POSSelfServiceDeviceService.update(parseInt(id), {
-      ip_address: ip_address !== undefined ? String(ip_address).trim() : undefined,
       name: name !== undefined ? (name?.trim() || null) : undefined,
       warehouse_id: warehouse_id !== undefined ? parseInt(warehouse_id) : undefined,
       is_active: is_active !== undefined ? !!is_active : undefined,

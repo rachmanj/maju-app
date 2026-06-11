@@ -1,19 +1,37 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Table, Button, Input, App, Modal, Form, Switch, Space, Select } from "antd";
-import { PlusOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
+import { Table, Button, Input, App, Modal, Form, Switch, Space, Select, Tag, Typography } from "antd";
+import { PlusOutlined, EditOutlined, DeleteOutlined, LinkOutlined, DisconnectOutlined } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 import { Popconfirm } from "antd";
 
 interface DeviceRow {
   id: number;
-  ip_address: string;
+  device_token: string | null;
+  is_paired: boolean;
+  pairing_code: string | null;
+  pairing_expires_at: string | null;
   name: string | null;
   warehouse_id: number;
   warehouse_code?: string;
   warehouse_name?: string;
   is_active: boolean;
+}
+
+function formatCountdown(expiresAt: string | null): string | null {
+  if (!expiresAt) return null;
+  const remainingMs = new Date(expiresAt).getTime() - Date.now();
+  if (remainingMs <= 0) return "Kedaluwarsa";
+  const totalSeconds = Math.floor(remainingMs / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+function isPairingCodeActive(record: DeviceRow): boolean {
+  if (!record.pairing_code || !record.pairing_expires_at) return false;
+  return new Date(record.pairing_expires_at).getTime() > Date.now();
 }
 
 export function POSSelfServiceDevicesTable() {
@@ -25,6 +43,9 @@ export function POSSelfServiceDevicesTable() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [pairingLoadingId, setPairingLoadingId] = useState<number | null>(null);
+  const [unpairLoadingId, setUnpairLoadingId] = useState<number | null>(null);
+  const [now, setNow] = useState(Date.now());
 
   const fetchDevices = useCallback(async () => {
     try {
@@ -62,6 +83,11 @@ export function POSSelfServiceDevicesTable() {
     if (modalOpen) fetchWarehouses();
   }, [modalOpen, fetchWarehouses]);
 
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   const openAddModal = () => {
     setEditingId(null);
     form.resetFields();
@@ -71,7 +97,6 @@ export function POSSelfServiceDevicesTable() {
   const openEditModal = (record: DeviceRow) => {
     setEditingId(record.id);
     form.setFieldsValue({
-      ip_address: record.ip_address,
       name: record.name || "",
       warehouse_id: record.warehouse_id,
       is_active: record.is_active,
@@ -88,7 +113,6 @@ export function POSSelfServiceDevicesTable() {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            ip_address: values.ip_address,
             name: values.name || undefined,
             warehouse_id: values.warehouse_id,
             is_active: values.is_active,
@@ -104,7 +128,6 @@ export function POSSelfServiceDevicesTable() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            ip_address: values.ip_address,
             name: values.name || undefined,
             warehouse_id: values.warehouse_id,
           }),
@@ -135,8 +158,41 @@ export function POSSelfServiceDevicesTable() {
     }
   };
 
+  const handleGeneratePairingCode = async (id: number) => {
+    try {
+      setPairingLoadingId(id);
+      const res = await fetch(`/api/settings/pos-self-service-devices/${id}/generate-pairing-code`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Gagal membuat kode pairing");
+      message.success(`Kode pairing: ${data.pairing_code}`);
+      fetchDevices();
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : "Terjadi kesalahan");
+    } finally {
+      setPairingLoadingId(null);
+    }
+  };
+
+  const handleUnpair = async (id: number) => {
+    try {
+      setUnpairLoadingId(id);
+      const res = await fetch(`/api/settings/pos-self-service-devices/${id}/unpair`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Gagal mencabut pairing");
+      message.success("Pairing device berhasil dicabut");
+      fetchDevices();
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : "Terjadi kesalahan");
+    } finally {
+      setUnpairLoadingId(null);
+    }
+  };
+
   const columns: ColumnsType<DeviceRow> = [
-    { title: "IP Address", dataIndex: "ip_address", key: "ip_address", render: (t) => <span className="font-mono">{t}</span> },
     { title: "Nama", dataIndex: "name", key: "name", render: (t) => t || "-" },
     {
       title: "Gudang",
@@ -144,7 +200,41 @@ export function POSSelfServiceDevicesTable() {
       render: (_, r) => (r.warehouse_code ? `${r.warehouse_code} - ${r.warehouse_name || ""}` : r.warehouse_name || "-"),
     },
     {
-      title: "Status",
+      title: "Status Pairing",
+      key: "pairing_status",
+      render: (_, record) =>
+        record.is_paired ? <Tag color="green">Terpasang</Tag> : <Tag>Belum Dipasangkan</Tag>,
+    },
+    {
+      title: "Kode Pairing",
+      key: "pairing_code",
+      render: (_, record) => {
+        void now;
+        if (isPairingCodeActive(record)) {
+          const countdown = formatCountdown(record.pairing_expires_at);
+          return (
+            <Space direction="vertical" size={0}>
+              <Typography.Text className="font-mono text-base">{record.pairing_code}</Typography.Text>
+              <Typography.Text type="secondary" className="text-xs">
+                Berlaku {countdown}
+              </Typography.Text>
+            </Space>
+          );
+        }
+        return (
+          <Button
+            size="small"
+            icon={<LinkOutlined />}
+            loading={pairingLoadingId === record.id}
+            onClick={() => handleGeneratePairingCode(record.id)}
+          >
+            Generate Kode
+          </Button>
+        );
+      },
+    },
+    {
+      title: "Aktif",
       dataIndex: "is_active",
       key: "is_active",
       render: (v) => (v !== false ? "Aktif" : "Nonaktif"),
@@ -154,10 +244,28 @@ export function POSSelfServiceDevicesTable() {
       key: "action",
       align: "right",
       render: (_, record) => (
-        <Space>
+        <Space wrap>
           <Button type="link" size="small" icon={<EditOutlined />} onClick={() => openEditModal(record)}>
             Ubah
           </Button>
+          {record.is_paired && (
+            <Popconfirm
+              title="Cabut pairing device ini?"
+              description="PC harus dipasangkan ulang dengan kode pairing baru."
+              onConfirm={() => handleUnpair(record.id)}
+              okText="Ya"
+              cancelText="Batal"
+            >
+              <Button
+                type="link"
+                size="small"
+                icon={<DisconnectOutlined />}
+                loading={unpairLoadingId === record.id}
+              >
+                Cabut Pairing
+              </Button>
+            </Popconfirm>
+          )}
           <Popconfirm
             title="Hapus device ini?"
             onConfirm={() => handleDelete(record.id)}
@@ -177,7 +285,7 @@ export function POSSelfServiceDevicesTable() {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-4">
         <p className="text-muted-foreground text-sm">
-          Daftar IP address yang diizinkan mengakses POS Self-Service (route /pos). Setiap IP terhubung ke satu gudang.
+          Daftar device POS Self-Service (route /pos). Setiap device dipasangkan ke satu gudang menggunakan kode pairing.
         </p>
         <Button type="primary" icon={<PlusOutlined />} onClick={openAddModal}>
           Tambah Device
@@ -189,6 +297,7 @@ export function POSSelfServiceDevicesTable() {
         rowKey="id"
         loading={loading}
         pagination={false}
+        scroll={{ x: 900 }}
       />
       <Modal
         title={editingId ? "Ubah Device POS Self-Service" : "Tambah Device POS Self-Service"}
@@ -199,13 +308,6 @@ export function POSSelfServiceDevicesTable() {
         destroyOnHidden
       >
         <Form form={form} layout="vertical" className="mt-4">
-          <Form.Item
-            label="IP Address"
-            name="ip_address"
-            rules={[{ required: true, message: "IP address wajib diisi" }]}
-          >
-            <Input placeholder="127.0.0.1 atau 192.168.1.100" disabled={!!editingId} />
-          </Form.Item>
           <Form.Item label="Nama (opsional)" name="name">
             <Input placeholder="Mis. POS Kantor Utama" />
           </Form.Item>

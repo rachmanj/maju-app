@@ -156,7 +156,7 @@ export default function SettingsPage() {
         </span>
       ),
       children: (
-        <Card title="Device POS Self-Service (IP + Gudang)">
+        <Card title="Device POS Self-Service (Pairing + Gudang)">
           <POSSelfServiceDevicesTable />
         </Card>
       ),

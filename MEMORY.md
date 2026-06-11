@@ -126,7 +126,7 @@
 
 ---
 
-### [030] POS Self-Service IP Check Improvements & Build Fixes (2026-03-03) ✅ COMPLETE
+### [030] POS Self-Service IP Check Improvements & Build Fixes (2026-03-03) ✅ SUPERSEDED by [031]
 
 **Challenge**: User accessing /pos via `http://10.10.110.34:3000/pos` saw "IP tidak terdaftar" despite registering that IP; x-forwarded-for/x-real-ip often missing in dev. Production build failed with TypeScript errors.
 
@@ -142,7 +142,25 @@
 
 ---
 
-### [029] POS Self-Service: IP Whitelist + Login di /pos (2026-03-03) ✅ COMPLETE
+### [031] POS Self-Service: Pairing Code → Device Token (2026-06-10) ✅ COMPLETE
+
+**Challenge**: IP whitelist tidak bisa membedakan PC di jaringan kantor (NAT) — semua PC terlihat sebagai IP router yang sama.
+
+**Solution**:
+- **Schema**: `pos_self_service_devices` — ganti `ip_address` dengan `device_token`, `pairing_code`, `pairing_expires_at`.
+- **Pairing flow**: Admin buat device + generate kode 6 digit (15 menit) di Pengaturan → PC buka `/pos` → masukkan kode → token disimpan di `localStorage` (`pos_device_token`).
+- **Access check**: `GET /api/pos-public/check-access` baca header `X-Device-Token`, bukan IP.
+- **API baru**: `POST /api/pos-public/pair`, `POST .../generate-pairing-code`, `POST .../unpair`.
+- **Unpair**: Admin cabut pairing → `device_token` dihapus di server → PC harus pairing ulang dengan kode baru.
+- **Status paired**: `is_paired = device_token && !pairing_code` (kode aktif = menunggu claim).
+
+**Key Learning**: IP whitelist gagal di jaringan NAT (satu public IP untuk banyak PC). Pairing code + localStorage token membedakan per-browser/per-PC tanpa konfigurasi infrastruktur. Token di header (bukan query string) agar tidak tercatat di URL logs. Supersedes [029] dan [030].
+
+**Files**: prisma/schema.prisma, lib/db/schema.sql, lib/services/pos-self-service-device-service.ts, app/api/pos-public/check-access, app/api/pos-public/pair, app/api/settings/pos-self-service-devices/*, components/settings/pos-self-service-devices-table.tsx, app/(pos)/pos/page.tsx
+
+---
+
+### [029] POS Self-Service: IP Whitelist + Login di /pos (2026-03-03) ✅ SUPERSEDED by [031]
 
 **Challenge**: POS self-service harus di luar member area, akses langsung di /pos dengan login di halaman; hanya PC terdaftar (IP); gudang otomatis dari mapping IP.
 
