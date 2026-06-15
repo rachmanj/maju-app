@@ -172,11 +172,18 @@ export class ProductService {
   static async getPrices(productId: number, warehouseId?: number): Promise<
     { id: number; product_id: number; warehouse_id?: number; warehouse_code?: string; unit_id: number; unit_code?: string; price: number; effective_date: Date; expiry_date?: Date; is_active: boolean }[]
   > {
-    const where: { product_id: bigint; is_active: boolean; warehouse_id?: number | null } = {
+    const where: {
+      product_id: bigint;
+      is_active: boolean;
+      warehouse_id?: number | null;
+      OR?: { warehouse_id: bigint | null }[];
+    } = {
       product_id: BigInt(productId),
       is_active: true,
     };
-    if (warehouseId !== undefined) where.warehouse_id = warehouseId;
+    if (warehouseId !== undefined) {
+      where.OR = [{ warehouse_id: BigInt(warehouseId) }, { warehouse_id: null }];
+    }
     const rows = await prisma.product_prices.findMany({
       where,
       include: {

@@ -91,6 +91,8 @@ export function ProductSelectionModal({
 
   useEffect(() => {
     if (open) {
+      setSearch("");
+      setCategoryId(undefined);
       fetchCategories();
     }
   }, [open, fetchCategories]);
@@ -149,7 +151,7 @@ export function ProductSelectionModal({
         onCancel={onClose}
         footer={null}
         width={720}
-        destroyOnClose
+        destroyOnHidden
       >
         {!warehouseId ? (
           <p className="text-muted-foreground">Pilih gudang terlebih dahulu.</p>
@@ -184,6 +186,7 @@ export function ProductSelectionModal({
               loading={loading}
               pagination={{ pageSize: 10, size: "small" }}
               size="small"
+              locale={{ emptyText: loading ? "Memuat..." : "Tidak ada produk ditemukan" }}
               onRow={(record) => ({
                 onClick: () => handleRowClick(record),
                 style: { cursor: "pointer" },

@@ -10,7 +10,34 @@ const PAYMENT_CASH = 'cash';
 const PAYMENT_POTONG_GAJI = 'potong_gaji';
 const PAYMENT_SIMPANAN = 'simpanan';
 
+type SellPriceResult = { unit_price: number; unit_id: number; unit_code: string };
+
 export class POSService {
+  static async resolveSellPrice(
+    productId: number,
+    warehouseId: number,
+    fallback?: { sales_price?: number | null; base_unit_id: number; base_unit_code: string }
+  ): Promise<SellPriceResult | null> {
+    const prices = await ProductService.getPrices(productId, warehouseId);
+    const price = prices.length > 0 ? prices[0] : (await ProductService.getPrices(productId))[0];
+    if (price) {
+      return {
+        unit_price: price.price,
+        unit_id: price.unit_id,
+        unit_code: price.unit_code ?? fallback?.base_unit_code ?? '',
+      };
+    }
+    const sales = fallback?.sales_price;
+    if (sales != null && Number(sales) > 0 && fallback) {
+      return {
+        unit_price: Number(sales),
+        unit_id: fallback.base_unit_id,
+        unit_code: fallback.base_unit_code,
+      };
+    }
+    return null;
+  }
+
   static async listDevices(): Promise<{ id: number; code: string; name: string; is_active: boolean }[]> {
     const rows = await prisma.pos_devices.findMany({
       where: { is_active: true },
@@ -170,6 +197,14 @@ export class POSService {
       price: p.price,
     }));
 
+    if (priceList.length === 0 && product.sales_price != null && Number(product.sales_price) > 0) {
+      priceList.push({
+        unit_id: product.base_unit_id,
+        unit_code: product.base_unit_code ?? '',
+        price: Number(product.sales_price),
+      });
+    }
+
     return {
       id: Number(product.id),
       code: product.code,
@@ -200,9 +235,12 @@ export class POSService {
     if (!product) return null;
 
     const stock = await StockService.getQuantity(warehouseId, Number(product.id));
-    const prices = await ProductService.getPrices(Number(product.id), warehouseId);
-    const price = prices.length > 0 ? prices[0] : (await ProductService.getPrices(Number(product.id)))[0];
-    if (!price) return null;
+    const sellPrice = await POSService.resolveSellPrice(Number(product.id), warehouseId, {
+      sales_price: product.sales_price != null ? Number(product.sales_price) : null,
+      base_unit_id: product.base_unit_id,
+      base_unit_code: product.base_unit.code,
+    });
+    if (!sellPrice) return null;
 
     return {
       id: Number(product.id),
@@ -211,9 +249,9 @@ export class POSService {
       base_unit_id: product.base_unit_id,
       base_unit_code: product.base_unit.code,
       quantity: stock,
-      unit_price: price.price,
-      unit_id: price.unit_id,
-      unit_code: price.unit_code ?? '',
+      unit_price: sellPrice.unit_price,
+      unit_id: sellPrice.unit_id,
+      unit_code: sellPrice.unit_code,
     };
   }
 
@@ -236,11 +274,27 @@ export class POSService {
         ],
       }),
       ...(categoryId != null && { category_id: categoryId }),
+      AND: [
+        {
+          OR: [
+            { sales_price: { not: null } },
+            {
+              product_prices: {
+                some: {
+                  is_active: true,
+                  OR: [{ warehouse_id: BigInt(warehouseId) }, { warehouse_id: null }],
+                },
+              },
+            },
+          ],
+        },
+      ],
     };
 
     const products = await prisma.products.findMany({
       where,
       take: limit,
+      orderBy: { name: 'asc' },
       include: {
         base_unit: { select: { id: true, code: true } },
         category: { select: { name: true } },
@@ -250,21 +304,24 @@ export class POSService {
     const result: { id: number; code: string; name: string; barcode: string | null; quantity: number; unit_price: number; unit_id: number; unit_code: string; category_name?: string }[] = [];
     for (const p of products) {
       const stock = await StockService.getQuantity(warehouseId, Number(p.id));
-      const prices = await ProductService.getPrices(Number(p.id), warehouseId);
-      const price = prices.length > 0 ? prices[0] : (await ProductService.getPrices(Number(p.id)))[0];
-      if (price) {
-        result.push({
-          id: Number(p.id),
-          code: p.code,
-          name: p.name,
-          barcode: p.barcode,
-          quantity: stock,
-          unit_price: price.price,
-          unit_id: price.unit_id,
-          unit_code: price.unit_code ?? p.base_unit.code,
-          category_name: (p as { category?: { name: string } }).category?.name,
-        });
-      }
+      const sellPrice = await POSService.resolveSellPrice(Number(p.id), warehouseId, {
+        sales_price: p.sales_price != null ? Number(p.sales_price) : null,
+        base_unit_id: p.base_unit_id,
+        base_unit_code: p.base_unit.code,
+      });
+      if (!sellPrice) continue;
+
+      result.push({
+        id: Number(p.id),
+        code: p.code,
+        name: p.name,
+        barcode: p.barcode,
+        quantity: stock,
+        unit_price: sellPrice.unit_price,
+        unit_id: sellPrice.unit_id,
+        unit_code: sellPrice.unit_code,
+        category_name: (p as { category?: { name: string } }).category?.name,
+      });
     }
     return result;
   }

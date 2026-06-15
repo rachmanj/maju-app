@@ -1,5 +1,5 @@
 **Purpose**: AI's persistent knowledge base for project context and learnings
-**Last Updated**: 2026-04-05
+**Last Updated**: 2026-06-15
 
 ## Memory Maintenance Guidelines
 
@@ -26,6 +26,22 @@
 ---
 
 ## Project Memory Entries
+
+### [035] POS Self-Service checkout Potong Gaji only (2026-06-15) ✅ COMPLETE
+
+**Challenge**: Self-service kiosk should not offer Tunai or Simpanan; employees purchase via payroll deduction only.
+
+**Solution**: `app/(pos)/pos/page.tsx` checkout Select defaults to `potong_gaji`; `cash` and `simpanan` options `disabled: true`. Dashboard kasir `/dashboard/pos` unchanged.
+
+**Key Learning**: Self-service payment restrictions are UI-scoped; `POST /api/pos-public/checkout` still accepts all methods for API consistency.
+
+### [034] POS Self-Service product modal empty list (2026-06-15) ✅ COMPLETE
+
+**Challenge**: "Pilih Produk" modal search returned no products despite 57 active items in DB.
+
+**Solution**: Excel-uploaded products store price in `products.sales_price` but not `product_prices`. `searchProducts` only included rows with `product_prices`, and default `findMany` skipped low-ID priced legacy rows. Added `resolveSellPrice()` fallback to `sales_price` + filter `sales_price OR product_prices`.
+
+**Key Learning**: POS pricing must resolve `product_prices` first, then `sales_price` on the product row — especially after bulk Excel import.
 
 ### [033] Loan balance Excel export, list filters, dashboard loan stats (2026-04-05) ✅ COMPLETE
 

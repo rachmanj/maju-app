@@ -59,7 +59,7 @@ export default function POSSelfServicePage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [productModalOpen, setProductModalOpen] = useState(false);
   const [checkoutModal, setCheckoutModal] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<"cash" | "potong_gaji" | "simpanan">("cash");
+  const [paymentMethod, setPaymentMethod] = useState<"cash" | "potong_gaji" | "simpanan">("potong_gaji");
   const [pin, setPin] = useState("");
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [loginForm] = Form.useForm();
@@ -498,9 +498,9 @@ export default function POSSelfServicePage() {
               value={paymentMethod}
               onChange={setPaymentMethod}
               options={[
-                { value: "cash", label: "Tunai" },
+                { value: "cash", label: "Tunai", disabled: true },
                 { value: "potong_gaji", label: "Potong Gaji" },
-                { value: "simpanan", label: "Simpanan Sukarela" },
+                { value: "simpanan", label: "Simpanan Sukarela", disabled: true },
               ]}
             />
           </div>
