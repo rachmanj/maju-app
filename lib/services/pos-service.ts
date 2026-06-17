@@ -135,43 +135,83 @@ export class POSService {
     return Number(session.id);
   }
 
-  static async lookupMember(barcodeOrEmail: string): Promise<{ id: number; name: string; limit: number; has_pin: boolean } | null> {
-    const trimmed = barcodeOrEmail.trim();
-    if (!trimmed) return null;
+  private static async formatMemberLookup(
+    memberId: bigint,
+    name: string,
+    member_number?: string | null
+  ): Promise<{ id: number; name: string; member_number: string | null; limit: number; has_pin: boolean }> {
+    const limit = await MemberService.getPurchaseLimit(Number(memberId));
+    const hasPin = !!(await prisma.member_pins.findUnique({ where: { member_id: memberId } }));
+    return {
+      id: Number(memberId),
+      name,
+      member_number: member_number ?? null,
+      limit,
+      has_pin: hasPin,
+    };
+  }
+
+  static async lookupMembers(
+    query: string,
+    resultLimit = 20
+  ): Promise<{ id: number; name: string; member_number: string | null; limit: number; has_pin: boolean }[]> {
+    const trimmed = query.trim();
+    if (!trimmed) return [];
+
+    const activeMember = { status: 'active' as const, deleted_at: null };
 
     const barcodeMatch = await prisma.member_barcodes.findFirst({
       where: {
         barcode: trimmed,
         is_active: true,
-        member: { status: 'active', deleted_at: null },
+        member: activeMember,
       },
-      include: { member: true },
+      include: { member: { select: { id: true, name: true, member_number: true } } },
     });
     if (barcodeMatch?.member) {
-      const limit = await MemberService.getPurchaseLimit(Number(barcodeMatch.member_id));
-      const hasPin = !!(await prisma.member_pins.findUnique({ where: { member_id: barcodeMatch.member_id } }));
-      return {
-        id: Number(barcodeMatch.member_id),
-        name: barcodeMatch.member.name,
-        limit,
-        has_pin: hasPin,
-      };
+      return [
+        await this.formatMemberLookup(
+          barcodeMatch.member_id,
+          barcodeMatch.member.name,
+          barcodeMatch.member.member_number
+        ),
+      ];
     }
 
-    const emailMatch = await prisma.members.findFirst({
-      where: { email: trimmed, status: 'active', deleted_at: null },
+    const exactMatch = await prisma.members.findFirst({
+      where: {
+        ...activeMember,
+        OR: [{ email: trimmed }, { member_number: trimmed }, { nik: trimmed }],
+      },
+      select: { id: true, name: true, member_number: true },
     });
-    if (emailMatch) {
-      const limit = await MemberService.getPurchaseLimit(Number(emailMatch.id));
-      const hasPin = !!(await prisma.member_pins.findUnique({ where: { member_id: emailMatch.id } }));
-      return {
-        id: Number(emailMatch.id),
-        name: emailMatch.name,
-        limit,
-        has_pin: hasPin,
-      };
+    if (exactMatch) {
+      return [await this.formatMemberLookup(exactMatch.id, exactMatch.name, exactMatch.member_number)];
     }
-    return null;
+
+    const nameMatches = await prisma.members.findMany({
+      where: {
+        ...activeMember,
+        name: { contains: trimmed },
+      },
+      take: resultLimit,
+      orderBy: { name: 'asc' },
+      select: { id: true, name: true, member_number: true },
+    });
+
+    const results: { id: number; name: string; member_number: string | null; limit: number; has_pin: boolean }[] = [];
+    for (const m of nameMatches) {
+      results.push(await this.formatMemberLookup(m.id, m.name, m.member_number));
+    }
+    return results;
+  }
+
+  /** @deprecated Use lookupMembers */
+  static async lookupMember(barcodeOrEmail: string): Promise<{ id: number; name: string; limit: number; has_pin: boolean } | null> {
+    const members = await this.lookupMembers(barcodeOrEmail, 1);
+    if (members.length !== 1) return null;
+    const { member_number: _memberNumber, ...member } = members[0];
+    return member;
   }
 
   static async getProductForPOS(productId: number, warehouseId: number): Promise<{
@@ -228,8 +268,13 @@ export class POSService {
     unit_id: number;
     unit_code: string;
   } | null> {
+    const trimmed = barcode.trim();
     const product = await prisma.products.findFirst({
-      where: { barcode, deleted_at: null, is_active: true },
+      where: {
+        deleted_at: null,
+        is_active: true,
+        OR: [{ barcode: trimmed }, { code: trimmed }],
+      },
       include: { base_unit: { select: { id: true, code: true } } },
     });
     if (!product) return null;
@@ -333,6 +378,7 @@ export class POSService {
     items: { product_id: number; quantity: number; unit_id: number; unit_price: number }[];
     paymentMethod: typeof PAYMENT_CASH | typeof PAYMENT_POTONG_GAJI | typeof PAYMENT_SIMPANAN;
     pin?: string;
+    skipPinVerification?: boolean;
     discountAmount?: number;
     createdBy?: number;
   }): Promise<{ transaction_number: string; transaction_id: number }> {
@@ -355,9 +401,11 @@ export class POSService {
       if (currentReceivable + total > limit) {
         throw new Error(`Limit pembelanjaan terlampaui. Limit: Rp ${limit.toLocaleString('id-ID')}, Piutang saat ini: Rp ${currentReceivable.toLocaleString('id-ID')}`);
       }
-      if (!params.pin) throw new Error('PIN diperlukan untuk pembayaran Potong Gaji');
-      const pinValid = await MemberService.verifyPin(params.memberId, params.pin);
-      if (!pinValid) throw new Error('PIN salah');
+      if (!params.skipPinVerification) {
+        if (!params.pin) throw new Error('PIN diperlukan untuk pembayaran Potong Gaji');
+        const pinValid = await MemberService.verifyPin(params.memberId, params.pin);
+        if (!pinValid) throw new Error('PIN salah');
+      }
     }
 
     if (params.paymentMethod === PAYMENT_SIMPANAN) {

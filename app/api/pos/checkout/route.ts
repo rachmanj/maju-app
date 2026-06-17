@@ -40,6 +40,7 @@ export async function POST(request: NextRequest) {
       })),
       paymentMethod: paymentMethod as 'cash' | 'potong_gaji' | 'simpanan',
       pin,
+      skipPinVerification: true,
       discountAmount: discountAmount != null ? parseFloat(discountAmount) : undefined,
       createdBy: parseInt(session.user.id),
     });

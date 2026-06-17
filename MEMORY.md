@@ -1,5 +1,5 @@
 **Purpose**: AI's persistent knowledge base for project context and learnings
-**Last Updated**: 2026-06-15
+**Last Updated**: 2026-06-17
 
 ## Memory Maintenance Guidelines
 
@@ -26,6 +26,16 @@
 ---
 
 ## Project Memory Entries
+
+### [036] Dashboard POS kasir lookup & checkout UX (2026-06-17) ✅ COMPLETE
+
+**Challenge**: Kasir "Cari Anggota" only matched barcode/email; users needed member_number, NIK, and partial name (`LIKE %query%`). Product scan ignored `products.code`. Searches failed silently. Kasir wrongly required member PIN for Potong Gaji.
+
+**Solution**: `POSService.lookupMembers` — priority exact identifiers then `name contains` (max 20); API returns `{ members }`; UI auto-select or picker. `lookupProductByBarcode` matches code. Validation toasts on POS page. `skipPinVerification: true` on `/api/pos/checkout`; PIN UI removed from kasir; `/api/pos-public/checkout` still verifies PIN.
+
+**Key Learning**: Kasir trust = staff session + member lookup; self-service trust = member session + PIN. Fuzzy name search belongs in `lookupMembers`, not the members list API.
+
+**Files**: `lib/services/pos-service.ts`, `app/api/pos/member/lookup/route.ts`, `app/api/pos/checkout/route.ts`, `app/(dashboard)/dashboard/pos/page.tsx`
 
 ### [035] POS Self-Service checkout Potong Gaji only (2026-06-15) ✅ COMPLETE
 

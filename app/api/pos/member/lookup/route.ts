@@ -11,13 +11,16 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { barcodeOrEmail } = body;
+    const { barcodeOrEmail, limit } = body;
     if (!barcodeOrEmail) {
       return NextResponse.json({ error: 'barcodeOrEmail required' }, { status: 400 });
     }
 
-    const member = await POSService.lookupMember(barcodeOrEmail);
-    return NextResponse.json(member);
+    const members = await POSService.lookupMembers(
+      barcodeOrEmail,
+      limit != null ? parseInt(String(limit)) : 20
+    );
+    return NextResponse.json({ members });
   } catch (error: any) {
     console.error('Error looking up member:', error);
     return NextResponse.json(

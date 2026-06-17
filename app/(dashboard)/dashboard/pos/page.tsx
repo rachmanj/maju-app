@@ -47,7 +47,10 @@ export default function POSPage() {
   const [warehouseId, setWarehouseId] = useState<number | null>(null);
   const [sessionId, setSessionId] = useState<number | null>(null);
   const [memberInput, setMemberInput] = useState("");
-  const [member, setMember] = useState<{ id: number; name: string; limit: number; has_pin: boolean } | null>(null);
+  const [member, setMember] = useState<{ id: number; name: string; limit: number } | null>(null);
+  const [memberCandidates, setMemberCandidates] = useState<
+    { id: number; name: string; member_number: string | null; limit: number }[]
+  >([]);
   const [memberLoading, setMemberLoading] = useState(false);
   const [productSearch, setProductSearch] = useState("");
   const [products, setProducts] = useState<
@@ -57,7 +60,6 @@ export default function POSPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [checkoutModal, setCheckoutModal] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "potong_gaji" | "simpanan">("cash");
-  const [pin, setPin] = useState("");
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [openingCash, setOpeningCash] = useState(0);
   const [openSessionModal, setOpenSessionModal] = useState(false);
@@ -141,20 +143,37 @@ export default function POSPage() {
     }
   };
 
+  const selectMember = (data: { id: number; name: string; limit: number }) => {
+    setMember(data);
+    setMemberCandidates([]);
+    message.success(`Anggota: ${data.name}`);
+  };
+
   const handleMemberLookup = async () => {
-    if (!memberInput.trim()) return;
+    const query = memberInput.trim();
+    if (!query) {
+      message.warning("Masukkan barcode, nomor anggota, NIK, email, atau nama");
+      return;
+    }
     setMemberLoading(true);
     setMember(null);
+    setMemberCandidates([]);
     try {
       const res = await fetch("/api/pos/member/lookup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ barcodeOrEmail: memberInput.trim() }),
+        body: JSON.stringify({ barcodeOrEmail: query }),
       });
       const data = await res.json();
-      if (res.ok && data) {
-        setMember(data);
-        message.success(`Anggota: ${data.name}`);
+      if (!res.ok) {
+        message.error(data.error || "Gagal cari anggota");
+        return;
+      }
+      const members = Array.isArray(data.members) ? data.members : data ? [data] : [];
+      if (members.length === 1) {
+        selectMember(members[0]);
+      } else if (members.length > 1) {
+        setMemberCandidates(members);
       } else {
         message.warning("Anggota tidak ditemukan");
       }
@@ -166,15 +185,29 @@ export default function POSPage() {
   };
 
   const handleProductSearch = async () => {
-    if (!warehouseId || !productSearch.trim()) return;
+    const query = productSearch.trim();
+    if (!warehouseId) {
+      message.warning("Pilih gudang terlebih dahulu");
+      return;
+    }
+    if (!query) {
+      message.warning("Masukkan nama atau kode produk");
+      return;
+    }
     setProductSearching(true);
     try {
       const res = await fetch(
-        `/api/pos/products/search?warehouseId=${warehouseId}&q=${encodeURIComponent(productSearch)}`
+        `/api/pos/products/search?warehouseId=${warehouseId}&q=${encodeURIComponent(query)}`
       );
-      if (res.ok) {
-        const data = await res.json();
-        setProducts(data);
+      const data = await res.json();
+      if (!res.ok) {
+        message.error(data.error || "Gagal cari produk");
+        setProducts([]);
+        return;
+      }
+      setProducts(Array.isArray(data) ? data : []);
+      if (!data?.length) {
+        message.info("Produk tidak ditemukan");
       }
     } catch {
       message.error("Gagal cari produk");
@@ -184,27 +217,35 @@ export default function POSPage() {
   };
 
   const handleBarcodeScan = async (barcode: string) => {
-    if (!warehouseId || !barcode.trim()) return;
+    const code = barcode.trim();
+    if (!warehouseId) {
+      message.warning("Pilih gudang terlebih dahulu");
+      return;
+    }
+    if (!code) return;
     setBarcodeInput("");
     try {
       const res = await fetch(
-        `/api/pos/products/barcode?barcode=${encodeURIComponent(barcode)}&warehouseId=${warehouseId}`
+        `/api/pos/products/barcode?barcode=${encodeURIComponent(code)}&warehouseId=${warehouseId}`
       );
-      if (res.ok) {
-        const data = await res.json();
-        if (data) {
-          addToCart({
-            product_id: data.id,
-            product_name: data.name,
-            unit_id: data.unit_id,
-            unit_code: data.unit_code,
-            quantity: 1,
-            unit_price: data.unit_price,
-            total: data.unit_price,
-          });
-        } else {
-          message.warning("Produk tidak ditemukan");
-        }
+      const data = await res.json();
+      if (!res.ok) {
+        message.error(data.error || "Gagal scan barcode");
+        return;
+      }
+      if (data) {
+        addToCart({
+          product_id: data.id,
+          product_name: data.name,
+          unit_id: data.unit_id,
+          unit_code: data.unit_code,
+          quantity: 1,
+          unit_price: data.unit_price,
+          total: data.unit_price,
+        });
+        message.success(`${data.name} ditambahkan ke keranjang`);
+      } else {
+        message.warning("Produk tidak ditemukan");
       }
     } catch {
       message.error("Gagal scan barcode");
@@ -254,10 +295,6 @@ export default function POSPage() {
       message.warning("Pastikan session aktif, anggota terpilih, dan keranjang tidak kosong");
       return;
     }
-    if (paymentMethod === "potong_gaji" && (!member.has_pin || !pin)) {
-      message.warning("PIN diperlukan untuk Potong Gaji");
-      return;
-    }
     setCheckoutLoading(true);
     try {
       const res = await fetch("/api/pos/checkout", {
@@ -274,7 +311,6 @@ export default function POSPage() {
             unit_price: c.unit_price,
           })),
           paymentMethod,
-          pin: paymentMethod === "potong_gaji" ? pin : undefined,
         }),
       });
       const data = await res.json();
@@ -282,7 +318,6 @@ export default function POSPage() {
       message.success(`Transaksi ${data.transaction_number} berhasil`);
       setCart([]);
       setCheckoutModal(false);
-      setPin("");
     } catch (e: any) {
       message.error(e.message || "Checkout gagal");
     } finally {
@@ -366,7 +401,7 @@ export default function POSPage() {
 
             <div className="mt-4 flex flex-wrap gap-2">
               <Input
-                placeholder="Barcode / Email anggota"
+                placeholder="Barcode / No. Anggota / NIK / Email / Nama"
                 prefix={<BarcodeOutlined />}
                 value={memberInput}
                 onChange={(e) => setMemberInput(e.target.value)}
@@ -381,24 +416,41 @@ export default function POSPage() {
               )}
             </div>
 
+            {memberCandidates.length > 0 && (
+              <div className="mt-4 max-h-48 overflow-auto rounded border p-2">
+                {memberCandidates.map((m) => (
+                  <div
+                    key={m.id}
+                    className="flex cursor-pointer items-center justify-between rounded p-2 hover:bg-gray-100 dark:hover:bg-gray-800"
+                    onClick={() => selectMember(m)}
+                  >
+                    <span className="truncate">{m.name}</span>
+                    <span className="shrink-0 pl-2 text-muted-foreground">
+                      {m.member_number ?? "—"} · Limit: Rp {m.limit.toLocaleString("id-ID")}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div className="mt-4 flex flex-wrap gap-2">
               <Input
-                placeholder="Scan barcode produk"
+                placeholder="Scan barcode / kode produk"
                 prefix={<BarcodeOutlined />}
                 value={barcodeInput}
                 onChange={(e) => setBarcodeInput(e.target.value)}
-                onPressEnter={(e) => handleBarcodeScan((e.target as HTMLInputElement).value)}
+                onPressEnter={() => handleBarcodeScan(barcodeInput)}
                 style={{ maxWidth: 280 }}
               />
               <Input
-                placeholder="Cari produk..."
+                placeholder="Cari nama atau kode produk..."
                 prefix={<SearchOutlined />}
                 value={productSearch}
                 onChange={(e) => setProductSearch(e.target.value)}
                 onPressEnter={handleProductSearch}
-                style={{ maxWidth: 240 }}
+                style={{ minWidth: 200, maxWidth: 280 }}
               />
-              <Button loading={productSearching} onClick={handleProductSearch}>
+              <Button loading={productSearching} onClick={handleProductSearch} icon={<SearchOutlined />}>
                 Cari
               </Button>
             </div>
@@ -507,16 +559,6 @@ export default function POSPage() {
               ]}
             />
           </div>
-          {paymentMethod === "potong_gaji" && (
-            <div>
-              <label className="block mb-2">PIN Anggota</label>
-              <Input.Password
-                placeholder="Masukkan PIN"
-                value={pin}
-                onChange={(e) => setPin(e.target.value)}
-              />
-            </div>
-          )}
         </div>
       </Modal>
     </div>
