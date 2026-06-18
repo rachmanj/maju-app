@@ -1,5 +1,5 @@
 **Purpose**: AI's persistent knowledge base for project context and learnings
-**Last Updated**: 2026-06-17
+**Last Updated**: 2026-06-18
 
 ## Memory Maintenance Guidelines
 
@@ -26,6 +26,14 @@
 ---
 
 ## Project Memory Entries
+
+### [037] Laporan Potongan Gaji includes POS belanja (2026-06-18) ✅ COMPLETE
+
+**Challenge**: Tab Potongan Gaji only showed Simpanan Wajib and Angsuran Pinjaman; missing POS Potong Gaji receivables for payroll coordination.
+
+**Solution**: `ReportService.getPayrollDeductionReport` LEFT JOINs pending `member_receivables` by `due_year`/`due_month` matching selected bulan; new column `pos_purchase` and summary `total_pos_purchase`; UI column "Belanja POS".
+
+**Key Learning**: POS checkout creates receivables due next month — payroll report for bulan X aggregates `member_receivables` where `due_month` = X, not transaction date.
 
 ### [036] Dashboard POS kasir lookup & checkout UX (2026-06-17) ✅ COMPLETE
 

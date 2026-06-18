@@ -308,6 +308,7 @@ function AccountingReportsContent() {
                           { title: "Nama", dataIndex: "name", key: "name" },
                           { title: "Simpanan Wajib", dataIndex: "simpanan_wajib", key: "sw", align: "right", render: fmt },
                           { title: "Angsuran Pinjaman", dataIndex: "loan_installment", key: "li", align: "right", render: fmt },
+                          { title: "Belanja POS", dataIndex: "pos_purchase", key: "pos", align: "right", render: fmt },
                           { title: "Total Potongan", dataIndex: "total", key: "total", align: "right", render: fmt },
                         ]}
                         dataSource={payrollData.members || []}
@@ -319,6 +320,7 @@ function AccountingReportsContent() {
                         <div className="mt-4 text-right text-sm font-medium">
                           Total Simpanan Wajib: {fmt(payrollData.summary.total_simpanan_wajib)} |
                           Total Angsuran: {fmt(payrollData.summary.total_loan_installment)} |
+                          Total Belanja POS: {fmt(payrollData.summary.total_pos_purchase)} |
                           Total Potongan: {fmt(payrollData.summary.total)}
                         </div>
                       )}

@@ -90,24 +90,48 @@ export class ReportService {
   }
 
   static async getPayrollDeductionReport(month: string): Promise<{
-    members: { member_id: number; nik: string; name: string; simpanan_wajib: number; loan_installment: number; total: number }[];
-    summary: { total_simpanan_wajib: number; total_loan_installment: number; total: number };
+    members: {
+      member_id: number;
+      nik: string;
+      name: string;
+      simpanan_wajib: number;
+      loan_installment: number;
+      pos_purchase: number;
+      total: number;
+    }[];
+    summary: {
+      total_simpanan_wajib: number;
+      total_loan_installment: number;
+      total_pos_purchase: number;
+      total: number;
+    };
   }> {
+    const monthDate = new Date(month + '-01');
+    const dueYear = monthDate.getFullYear();
+    const dueMonth = monthDate.getMonth() + 1;
     const [startDate, endDate] = [
       `${month}-01`,
-      new Date(new Date(month + '-01').getFullYear(), new Date(month + '-01').getMonth() + 1, 0)
+      new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0)
         .toISOString()
         .split('T')[0],
     ];
 
     const rows = await prisma.$queryRaw<
-      { member_id: number; nik: string; name: string; simpanan_wajib: number; loan_installment: number }[]
+      {
+        member_id: number;
+        nik: string;
+        name: string;
+        simpanan_wajib: number;
+        loan_installment: number;
+        pos_purchase: number;
+      }[]
     >(Prisma.sql`
-      SELECT x.member_id, x.nik, x.name, x.simpanan_wajib, x.loan_installment
+      SELECT x.member_id, x.nik, x.name, x.simpanan_wajib, x.loan_installment, x.pos_purchase
       FROM (
         SELECT m.id as member_id, m.nik, m.name,
                COALESCE(sw.amount, 0) as simpanan_wajib,
-               COALESCE(loan.installment, 0) as loan_installment
+               COALESCE(loan.installment, 0) as loan_installment,
+               COALESCE(pos.amount, 0) as pos_purchase
         FROM members m
         LEFT JOIN (
           SELECT sa.member_id, st.minimum_amount as amount
@@ -122,22 +146,32 @@ export class ReportService {
           WHERE l.status = 'active' AND ls.due_date BETWEEN ${new Date(startDate)} AND ${new Date(endDate)}
           GROUP BY l.member_id
         ) loan ON loan.member_id = m.id
+        LEFT JOIN (
+          SELECT mr.member_id, SUM(mr.amount) as amount
+          FROM member_receivables mr
+          WHERE mr.status = 'pending'
+            AND mr.due_year = ${dueYear}
+            AND mr.due_month = ${dueMonth}
+          GROUP BY mr.member_id
+        ) pos ON pos.member_id = m.id
         WHERE m.status = 'active' AND m.deleted_at IS NULL
       ) x
-      WHERE x.simpanan_wajib > 0 OR x.loan_installment > 0
+      WHERE x.simpanan_wajib > 0 OR x.loan_installment > 0 OR x.pos_purchase > 0
       ORDER BY x.name
     `);
 
     const members = rows.map((r) => {
       const sw = Number(r.simpanan_wajib ?? 0);
       const inst = Number(r.loan_installment ?? 0);
+      const pos = Number(r.pos_purchase ?? 0);
       return {
         member_id: Number(r.member_id),
         nik: String(r.nik ?? ""),
         name: String(r.name ?? ""),
         simpanan_wajib: sw,
         loan_installment: inst,
-        total: sw + inst,
+        pos_purchase: pos,
+        total: sw + inst + pos,
       };
     });
 
@@ -145,9 +179,10 @@ export class ReportService {
       (s, m) => ({
         total_simpanan_wajib: s.total_simpanan_wajib + m.simpanan_wajib,
         total_loan_installment: s.total_loan_installment + m.loan_installment,
+        total_pos_purchase: s.total_pos_purchase + m.pos_purchase,
         total: s.total + m.total,
       }),
-      { total_simpanan_wajib: 0, total_loan_installment: 0, total: 0 }
+      { total_simpanan_wajib: 0, total_loan_installment: 0, total_pos_purchase: 0, total: 0 }
     );
 
     return { members, summary };
