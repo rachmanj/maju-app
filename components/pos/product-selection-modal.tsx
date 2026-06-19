@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Modal, Input, Select, Table, InputNumber, Button, message } from "antd";
+import { Modal, Input, Select, Table, InputNumber, Button, App } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 
@@ -42,6 +42,7 @@ export function ProductSelectionModal({
   warehouseId,
   onAddItem,
 }: ProductSelectionModalProps) {
+  const { message } = App.useApp();
   const [search, setSearch] = useState("");
   const [categoryId, setCategoryId] = useState<number | undefined>(undefined);
   const [categories, setCategories] = useState<{ id: number; code: string; name: string }[]>([]);
@@ -63,7 +64,7 @@ export function ProductSelectionModal({
     } catch {
       message.error("Gagal memuat kategori");
     }
-  }, []);
+  }, [message]);
 
   const fetchProducts = useCallback(async () => {
     if (!warehouseId) return;
@@ -87,7 +88,7 @@ export function ProductSelectionModal({
     } finally {
       setLoading(false);
     }
-  }, [warehouseId, search, categoryId]);
+  }, [warehouseId, search, categoryId, message]);
 
   useEffect(() => {
     if (open) {

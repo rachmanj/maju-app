@@ -10,7 +10,7 @@ import {
   Modal,
   Input,
   Form,
-  message,
+  App,
   Space,
   Typography,
 } from "antd";
@@ -24,6 +24,10 @@ import {
 } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 import { ProductSelectionModal, type ProductItem } from "@/components/pos/product-selection-modal";
+import {
+  POS_DEVICE_TOKEN_KEY,
+  usePosSelfService,
+} from "@/components/pos/pos-self-service-context";
 
 type CartItem = {
   product_id: number;
@@ -42,19 +46,17 @@ const formatCurrency = (n: number) =>
     minimumFractionDigits: 0,
   }).format(n);
 
-const POS_DEVICE_TOKEN_KEY = "pos_device_token";
-
-type AccessState =
-  | { status: "loading" }
-  | { status: "unpaired" }
-  | { status: "denied"; message?: string }
-  | { status: "allowed"; warehouseId: number; warehouseName: string };
-
 export default function POSSelfServicePage() {
+  const { message } = App.useApp();
   const { data: session, status: sessionStatus } = useSession();
-  const [access, setAccess] = useState<AccessState>({ status: "loading" });
-  const [deviceToken, setDeviceToken] = useState<string | null>(null);
-  const [warehouseId, setWarehouseId] = useState<number | null>(null);
+  const {
+    access,
+    setAccess,
+    setDeviceToken,
+    warehouseId,
+    checkAccess,
+    handleSignOut,
+  } = usePosSelfService();
   const [sessionId, setSessionId] = useState<number | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [productModalOpen, setProductModalOpen] = useState(false);
@@ -68,43 +70,8 @@ export default function POSSelfServicePage() {
   const [pairingLoading, setPairingLoading] = useState(false);
 
   const memberId = (session?.user as { memberId?: number | null })?.memberId ?? null;
-  const memberName = session?.user?.name ?? "Anggota";
   const roles = (session?.user as { roles?: string[] })?.roles ?? [];
   const isAnggota = roles.includes("anggota");
-
-  const checkAccess = useCallback(async (token?: string | null) => {
-    const activeToken = token ?? deviceToken ?? localStorage.getItem(POS_DEVICE_TOKEN_KEY);
-    if (!activeToken) {
-      setAccess({ status: "unpaired" });
-      return;
-    }
-
-    try {
-      const res = await fetch("/api/pos-public/check-access", {
-        headers: { "X-Device-Token": activeToken },
-      });
-      const data = await res.json();
-      if (data.allowed && data.warehouseId) {
-        setAccess({
-          status: "allowed",
-          warehouseId: data.warehouseId,
-          warehouseName: data.warehouseName || data.warehouseCode || "Gudang",
-        });
-        setWarehouseId(data.warehouseId);
-      } else if (data.unpaired) {
-        localStorage.removeItem(POS_DEVICE_TOKEN_KEY);
-        setDeviceToken(null);
-        setAccess({ status: "unpaired" });
-      } else {
-        setAccess({
-          status: "denied",
-          message: data.message || "Akses POS Self-Service ditolak",
-        });
-      }
-    } catch {
-      setAccess({ status: "denied", message: "Gagal memeriksa akses" });
-    }
-  }, [deviceToken]);
 
   const fetchSession = useCallback(async () => {
     try {
@@ -116,13 +83,7 @@ export default function POSSelfServicePage() {
     } catch {
       message.error("Gagal memuat session");
     }
-  }, []);
-
-  useEffect(() => {
-    const storedToken = localStorage.getItem(POS_DEVICE_TOKEN_KEY);
-    setDeviceToken(storedToken);
-    checkAccess(storedToken);
-  }, [checkAccess]);
+  }, [message]);
 
   const handlePair = async (values: { code: string }) => {
     setPairingLoading(true);
@@ -259,10 +220,6 @@ export default function POSSelfServicePage() {
     }
   };
 
-  const handleSignOut = () => {
-    window.location.href = "/api/auth/signout?callbackUrl=/pos";
-  };
-
   const cartColumns: ColumnsType<CartItem> = [
     { title: "Produk", dataIndex: "product_name", key: "product_name", ellipsis: true },
     {
@@ -304,7 +261,7 @@ export default function POSSelfServicePage() {
 
   if (access.status === "loading") {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex flex-1 items-center justify-center">
         <div className="text-muted-foreground">Memuat...</div>
       </div>
     );
@@ -312,7 +269,7 @@ export default function POSSelfServicePage() {
 
   if (access.status === "unpaired") {
     return (
-      <div className="flex min-h-screen items-center justify-center p-4">
+      <div className="flex flex-1 items-center justify-center p-4">
         <Card className="w-full max-w-md" title={<h1 className="mb-0 text-2xl font-bold">Pasangkan Device</h1>}>
           <p className="mb-6 text-muted-foreground">
             Masukkan kode pairing 6 digit dari Pengaturan → POS Self-Service.
@@ -347,7 +304,7 @@ export default function POSSelfServicePage() {
 
   if (access.status === "denied") {
     return (
-      <div className="flex min-h-screen items-center justify-center p-4">
+      <div className="flex flex-1 items-center justify-center p-4">
         <Card className="w-full max-w-md" title="Akses Ditolak">
           <p className="text-muted-foreground">{access.message}</p>
           <Button
@@ -369,7 +326,7 @@ export default function POSSelfServicePage() {
 
   if (access.status === "allowed" && sessionStatus === "unauthenticated") {
     return (
-      <div className="flex min-h-screen items-center justify-center p-4">
+      <div className="flex flex-1 items-center justify-center p-4">
         <Card className="w-full max-w-md" title={<h1 className="mb-0 text-2xl font-bold">POS Self-Service</h1>}>
           <p className="mb-6 text-muted-foreground">Masuk dengan akun anggota</p>
           <Form form={loginForm} layout="vertical" onFinish={handleLogin} size="large">
@@ -396,7 +353,7 @@ export default function POSSelfServicePage() {
 
   if (access.status === "allowed" && sessionStatus === "authenticated" && (!isAnggota || !memberId)) {
     return (
-      <div className="flex min-h-screen items-center justify-center p-4">
+      <div className="flex flex-1 items-center justify-center p-4">
         <Card className="w-full max-w-md" title={<h1 className="mb-0 text-2xl font-bold">POS Self-Service</h1>}>
           <p className="mb-4 text-amber-600">
             Hanya anggota yang dapat menggunakan POS Self-Service. Akun Anda bukan akun anggota.
@@ -413,25 +370,8 @@ export default function POSSelfServicePage() {
   }
 
   return (
-    <div className="min-h-screen p-4 md:p-6">
+    <div className="flex-1 p-4 md:p-6">
       <div className="mx-auto max-w-4xl space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold">POS Self-Service</h1>
-            <p className="text-muted-foreground text-sm">
-              {memberName} • {access.status === "allowed" ? access.warehouseName : ""}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Typography.Text className="text-muted-foreground text-sm">
-              Gudang: {access.status === "allowed" ? access.warehouseName : ""}
-            </Typography.Text>
-            <Button type="text" size="small" onClick={handleSignOut}>
-              Keluar
-            </Button>
-          </div>
-        </div>
-
         <Card
           title={
             <span>

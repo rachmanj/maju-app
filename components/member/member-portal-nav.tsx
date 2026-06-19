@@ -9,6 +9,7 @@ import type { MenuProps } from "antd";
 import Link from "next/link";
 import { ChangePasswordModal } from "@/components/auth/change-password-modal";
 import { SetPinModal } from "@/components/member/set-pin-modal";
+import { ThemeToggle } from "@/components/layout/theme-toggle";
 
 const navItems = [
   { href: "/member/dashboard", label: "Dashboard" },
@@ -84,11 +85,14 @@ export function MemberPortalNav() {
             );
           })}
         </nav>
-        <Dropdown menu={{ items: menuItems }} placement="bottomRight" trigger={["click"]}>
-          <Button type="text" className="!flex !h-9 !w-9 !items-center !justify-center !rounded-full !p-0">
-            <Avatar icon={<UserOutlined />} size="small" className="!bg-teal-500 !text-white" />
-          </Button>
-        </Dropdown>
+        <div className="flex shrink-0 items-center gap-2">
+          <ThemeToggle />
+          <Dropdown menu={{ items: menuItems }} placement="bottomRight" trigger={["click"]}>
+            <Button type="text" className="!flex !h-9 !w-9 !items-center !justify-center !rounded-full !p-0">
+              <Avatar icon={<UserOutlined />} size="small" className="!bg-teal-500 !text-white" />
+            </Button>
+          </Dropdown>
+        </div>
         <ChangePasswordModal
           open={changePasswordOpen}
           onClose={() => setChangePasswordOpen(false)}
