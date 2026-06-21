@@ -30,6 +30,7 @@ export const PERMISSIONS = {
   // POS
   POS_ACCESS: 'pos.access',
   POS_TRANSACTION: 'pos.transaction',
+  POS_DELETE: 'pos.delete',
   
   // Accounting
   ACCOUNTING_VIEW: 'accounting.view',
@@ -66,6 +67,7 @@ export const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     PERMISSIONS.LOAN_VIEW,
     PERMISSIONS.POS_ACCESS,
     PERMISSIONS.POS_TRANSACTION,
+    PERMISSIONS.POS_DELETE,
     PERMISSIONS.LOAN_APPROVE,
     PERMISSIONS.LOAN_DISBURSE,
     PERMISSIONS.INVENTORY_VIEW,
@@ -105,6 +107,7 @@ export const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     PERMISSIONS.REPORT_EXPORT,
     PERMISSIONS.POS_ACCESS,
     PERMISSIONS.POS_TRANSACTION,
+    PERMISSIONS.POS_DELETE,
   ],
   kasir: [
     PERMISSIONS.MEMBER_VIEW,

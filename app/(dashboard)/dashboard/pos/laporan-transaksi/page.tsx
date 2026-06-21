@@ -10,9 +10,14 @@ import {
   Space,
   Typography,
   message,
+  Modal,
+  Descriptions,
+  Spin,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { FileExcelOutlined } from "@ant-design/icons";
+import { FileExcelOutlined, EyeOutlined, DeleteOutlined } from "@ant-design/icons";
+import { useSession } from "next-auth/react";
+import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
 import dayjs, { Dayjs } from "dayjs";
 
 type TxRow = {
@@ -30,7 +35,27 @@ type TxRow = {
   payment_methods: string;
 };
 
+type TxDetail = TxRow & {
+  warehouse_code: string;
+  notes: string | null;
+  items: {
+    id: number;
+    product_code: string;
+    product_name: string;
+    quantity: number;
+    unit_code: string;
+    unit_price: number;
+    discount_amount: number;
+    total_amount: number;
+  }[];
+  payments: { payment_method: string; amount: number }[];
+};
+
 export default function PosLaporanTransaksiPage() {
+  const { data: session } = useSession();
+  const roles = (session?.user as { roles?: string[] })?.roles ?? [];
+  const canManagePos = hasPermission(roles, PERMISSIONS.POS_DELETE);
+
   const [range, setRange] = useState<[Dayjs | null, Dayjs | null]>([
     dayjs().startOf("month"),
     dayjs().endOf("day"),
@@ -44,6 +69,11 @@ export default function PosLaporanTransaksiPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [loading, setLoading] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detail, setDetail] = useState<TxDetail | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const fetchMembers = useCallback(async (q: string) => {
     setLoadingMembers(true);
@@ -108,7 +138,7 @@ export default function PosLaporanTransaksiPage() {
     return () => {
       cancelled = true;
     };
-  }, [range, memberId, page, pageSize]);
+  }, [range, memberId, page, pageSize, refreshKey]);
 
   const handleExport = () => {
     const [from, to] = range;
@@ -124,8 +154,80 @@ export default function PosLaporanTransaksiPage() {
     window.open(`/api/pos/transactions/export?${params}`, "_blank");
   };
 
+  const openDetail = async (transactionId: number) => {
+    setDetailOpen(true);
+    setDetailLoading(true);
+    setDetail(null);
+    try {
+      const res = await fetch(`/api/pos/transactions/${transactionId}`);
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error(json.error || "Gagal memuat detail transaksi");
+      }
+      setDetail(await res.json());
+    } catch (e: unknown) {
+      message.error(e instanceof Error ? e.message : "Gagal memuat detail transaksi");
+      setDetailOpen(false);
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const handleDelete = (record: TxRow) => {
+    Modal.confirm({
+      title: "Hapus transaksi POS?",
+      content: (
+        <div>
+          <p>
+            Transaksi <strong>{record.transaction_number}</strong> ({record.member_name}) akan dihapus
+            permanen.
+          </p>
+          <p className="mb-0 text-sm text-muted-foreground">
+            Stok barang akan dikembalikan. Piutang, simpanan, dan jurnal terkait akan dibatalkan.
+          </p>
+        </div>
+      ),
+      okText: "Hapus",
+      okType: "danger",
+      cancelText: "Batal",
+      onOk: async () => {
+        setDeletingId(record.id);
+        try {
+          const res = await fetch(`/api/pos/transactions/${record.id}`, { method: "DELETE" });
+          const json = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(json.error || "Gagal menghapus transaksi");
+          message.success("Transaksi berhasil dihapus");
+          setRefreshKey((k) => k + 1);
+        } catch (e: unknown) {
+          message.error(e instanceof Error ? e.message : "Gagal menghapus transaksi");
+        } finally {
+          setDeletingId(null);
+        }
+      },
+    });
+  };
+
   const fmtMoney = (n: number) =>
     new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
+
+  const itemColumns: ColumnsType<TxDetail["items"][number]> = [
+    { title: "Kode", dataIndex: "product_code", key: "product_code", width: 100 },
+    { title: "Produk", dataIndex: "product_name", key: "product_name" },
+    { title: "Qty", dataIndex: "quantity", key: "quantity", width: 80 },
+    { title: "Satuan", dataIndex: "unit_code", key: "unit_code", width: 80 },
+    {
+      title: "Harga",
+      dataIndex: "unit_price",
+      key: "unit_price",
+      render: (v: number) => fmtMoney(v),
+    },
+    {
+      title: "Subtotal",
+      dataIndex: "total_amount",
+      key: "total_amount",
+      render: (v: number) => fmtMoney(v),
+    },
+  ];
 
   const columns: ColumnsType<TxRow> = [
     {
@@ -142,6 +244,36 @@ export default function PosLaporanTransaksiPage() {
     { title: "Diskon", dataIndex: "discount_amount", align: "right", width: 100, render: (v: number) => fmtMoney(v) },
     { title: "Total", dataIndex: "total_amount", align: "right", width: 120, render: (v: number) => fmtMoney(v) },
     { title: "Pembayaran", dataIndex: "payment_methods", width: 140 },
+    ...(canManagePos
+      ? [
+          {
+            title: "Aksi",
+            key: "action",
+            width: 100,
+            fixed: "right" as const,
+            render: (_: unknown, record: TxRow) => (
+              <Space size="small">
+                <Button
+                  type="link"
+                  size="small"
+                  icon={<EyeOutlined />}
+                  title="Lihat detail"
+                  onClick={() => openDetail(record.id)}
+                />
+                <Button
+                  type="link"
+                  size="small"
+                  danger
+                  icon={<DeleteOutlined />}
+                  title="Hapus transaksi"
+                  loading={deletingId === record.id}
+                  onClick={() => handleDelete(record)}
+                />
+              </Space>
+            ),
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -204,7 +336,7 @@ export default function PosLaporanTransaksiPage() {
           loading={loading}
           columns={columns}
           dataSource={data}
-          scroll={{ x: 1100 }}
+          scroll={{ x: canManagePos ? 1200 : 1100 }}
           pagination={{
             current: page,
             pageSize,
@@ -218,6 +350,54 @@ export default function PosLaporanTransaksiPage() {
           }}
         />
       </Card>
+
+      <Modal
+        title={detail?.transaction_number ?? "Detail Transaksi POS"}
+        open={detailOpen}
+        onCancel={() => {
+          setDetailOpen(false);
+          setDetail(null);
+        }}
+        footer={null}
+        width={800}
+      >
+        {detailLoading ? (
+          <div className="flex justify-center py-8">
+            <Spin />
+          </div>
+        ) : detail ? (
+          <div className="space-y-4">
+            <Descriptions column={{ xs: 1, sm: 2 }} size="small" bordered>
+              <Descriptions.Item label="Tanggal">
+                {detail.transaction_date
+                  ? new Date(detail.transaction_date).toLocaleString("id-ID")
+                  : "-"}
+              </Descriptions.Item>
+              <Descriptions.Item label="Anggota">
+                {detail.member_number ? `${detail.member_number} — ` : ""}
+                {detail.member_name}
+              </Descriptions.Item>
+              <Descriptions.Item label="Gudang">
+                {detail.warehouse_code} — {detail.warehouse_name}
+              </Descriptions.Item>
+              <Descriptions.Item label="Pembayaran">{detail.payment_methods}</Descriptions.Item>
+              <Descriptions.Item label="Subtotal">{fmtMoney(detail.subtotal)}</Descriptions.Item>
+              <Descriptions.Item label="Diskon">{fmtMoney(detail.discount_amount)}</Descriptions.Item>
+              <Descriptions.Item label="Total">{fmtMoney(detail.total_amount)}</Descriptions.Item>
+            </Descriptions>
+            <Table
+              rowKey="id"
+              columns={itemColumns}
+              dataSource={detail.items}
+              pagination={false}
+              size="small"
+              locale={{ emptyText: "Tidak ada barang" }}
+            />
+          </div>
+        ) : (
+          <p className="text-muted-foreground">Transaksi tidak ditemukan</p>
+        )}
+      </Modal>
     </div>
   );
 }

@@ -793,6 +793,160 @@ export class POSService {
     return { summary, detailLines };
   }
 
+  static async getTransactionDetail(transactionId: number): Promise<{
+    id: number;
+    transaction_number: string;
+    transaction_date: string;
+    member_id: number;
+    member_number: string | null;
+    member_name: string;
+    warehouse_name: string;
+    warehouse_code: string;
+    subtotal: number;
+    discount_amount: number;
+    total_amount: number;
+    notes: string | null;
+    payment_methods: string;
+    items: {
+      id: number;
+      product_code: string;
+      product_name: string;
+      quantity: number;
+      unit_code: string;
+      unit_price: number;
+      discount_amount: number;
+      total_amount: number;
+    }[];
+    payments: { payment_method: string; amount: number }[];
+  } | null> {
+    const row = await prisma.pos_transactions.findFirst({
+      where: { id: BigInt(transactionId) },
+      include: {
+        member: { select: { member_number: true, name: true } },
+        warehouse: { select: { name: true, code: true } },
+        pos_payments: { orderBy: { id: 'asc' } },
+        pos_transaction_items: {
+          include: {
+            product: { select: { code: true, name: true } },
+            unit: { select: { code: true } },
+          },
+          orderBy: { id: 'asc' },
+        },
+      },
+    });
+    if (!row) return null;
+
+    const payMethods = row.pos_payments.length
+      ? row.pos_payments.map((p) => p.payment_method)
+      : ['cash'];
+    const payment_methods = this.formatPaymentMethodsLabel(payMethods);
+
+    return {
+      id: Number(row.id),
+      transaction_number: row.transaction_number,
+      transaction_date: row.transaction_date.toISOString(),
+      member_id: Number(row.member_id),
+      member_number: row.member.member_number ?? null,
+      member_name: row.member.name,
+      warehouse_name: row.warehouse.name,
+      warehouse_code: row.warehouse.code,
+      subtotal: Number(row.subtotal),
+      discount_amount: Number(row.discount_amount ?? 0),
+      total_amount: Number(row.total_amount),
+      notes: row.notes ?? null,
+      payment_methods,
+      items: row.pos_transaction_items.map((it) => ({
+        id: Number(it.id),
+        product_code: it.product.code,
+        product_name: it.product.name,
+        quantity: Number(it.quantity),
+        unit_code: it.unit.code,
+        unit_price: Number(it.unit_price),
+        discount_amount: Number(it.discount_amount ?? 0),
+        total_amount: Number(it.total_amount),
+      })),
+      payments: row.pos_payments.map((p) => ({
+        payment_method: p.payment_method,
+        amount: Number(p.amount),
+      })),
+    };
+  }
+
+  static async deleteTransaction(transactionId: number): Promise<void> {
+    const row = await prisma.pos_transactions.findFirst({
+      where: { id: BigInt(transactionId) },
+      include: {
+        pos_transaction_items: true,
+        pos_payments: true,
+        member_receivables: true,
+      },
+    });
+    if (!row) throw new Error('Transaksi tidak ditemukan');
+
+    const transNum = row.transaction_number;
+    const total = Number(row.total_amount);
+    const warehouseId = Number(row.warehouse_id);
+    const paymentMethod = row.pos_payments[0]?.payment_method ?? PAYMENT_CASH;
+
+    for (const rec of row.member_receivables) {
+      if (rec.status !== 'pending') {
+        throw new Error('Tidak dapat menghapus transaksi: piutang sudah dibayar atau diproses');
+      }
+    }
+
+    await prisma.$transaction(async (tx) => {
+      for (const item of row.pos_transaction_items) {
+        const qty = Number(item.quantity);
+        await tx.warehouse_stock.upsert({
+          where: {
+            warehouse_id_product_id: {
+              warehouse_id: BigInt(warehouseId),
+              product_id: item.product_id,
+            },
+          },
+          create: {
+            warehouse_id: BigInt(warehouseId),
+            product_id: item.product_id,
+            quantity: qty,
+          },
+          update: { quantity: { increment: qty } },
+        });
+      }
+
+      await tx.stock_movements.deleteMany({
+        where: { reference_type: 'pos_transaction', reference_id: row.id },
+      });
+
+      if (paymentMethod === PAYMENT_SIMPANAN) {
+        const savingsTx = await tx.savings_transactions.findFirst({
+          where: { reference_number: transNum },
+        });
+        if (savingsTx) {
+          await tx.savings_accounts.update({
+            where: { id: savingsTx.savings_account_id },
+            data: { balance: { increment: total } },
+          });
+          await tx.savings_transactions.delete({ where: { id: savingsTx.id } });
+        }
+      }
+
+      const journals = await tx.journal_entries.findMany({
+        where: { description: { contains: transNum } },
+        select: { id: true },
+      });
+      if (journals.length > 0) {
+        await tx.journal_entry_lines.deleteMany({
+          where: { journal_entry_id: { in: journals.map((j) => j.id) } },
+        });
+        await tx.journal_entries.deleteMany({
+          where: { id: { in: journals.map((j) => j.id) } },
+        });
+      }
+
+      await tx.pos_transactions.delete({ where: { id: row.id } });
+    });
+  }
+
   static async getMemberTransactionDetail(
     memberId: number,
     transactionId: number

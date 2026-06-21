@@ -60,6 +60,19 @@ export default function MemberDashboardPage() {
     );
   }
 
+  const TYPE_DISPLAY_ORDER = ["POKOK", "WAJIB", "SUKARELA_SHU", "SUKARELA_REGULER"];
+  const DISPLAY_NAME_OVERRIDE: Record<string, string> = {
+    SUKARELA_REGULER: "Simpanan Sukarela",
+  };
+
+  const savingsByType = data.savingsByType
+    .filter((s) => s.code !== "SUKARELA")
+    .sort((a, b) => TYPE_DISPLAY_ORDER.indexOf(a.code) - TYPE_DISPLAY_ORDER.indexOf(b.code))
+    .map((s) => ({
+      ...s,
+      name: DISPLAY_NAME_OVERRIDE[s.code] ?? s.name,
+    }));
+
   const formatRupiah = (n: number) =>
     new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
 
@@ -160,13 +173,13 @@ export default function MemberDashboardPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <Card title="Simpanan per Jenis" className="shadow-sm">
           <ul className="space-y-2">
-            {data.savingsByType.map((s) => (
+            {savingsByType.map((s) => (
               <li key={s.code} className="flex justify-between">
                 <span className="text-[hsl(var(--foreground))]/80">{s.name}</span>
                 <span className="font-medium">{formatRupiah(s.balance)}</span>
               </li>
             ))}
-            {data.savingsByType.length === 0 && (
+            {savingsByType.length === 0 && (
               <li className="text-[hsl(var(--muted-foreground))]">Belum ada simpanan</li>
             )}
           </ul>
