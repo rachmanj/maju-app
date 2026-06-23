@@ -26,7 +26,7 @@ interface DashboardData {
   savingsByType: { code: string; name: string; balance: number }[];
   totalOutstanding: number;
   activeLoansCount: number;
-  recentTransactions: { id: number; type: string; amount: number; date: string; savings_type?: string }[];
+  recentTransactions: { id: number; type: string; amount: number; date: string; savings_type?: string; savings_type_code?: string }[];
 }
 
 export default function MemberDashboardPage() {
@@ -72,6 +72,18 @@ export default function MemberDashboardPage() {
       ...s,
       name: DISPLAY_NAME_OVERRIDE[s.code] ?? s.name,
     }));
+
+  const withdrawableFunds = data.savingsByType
+    .filter((s) => s.code === "SUKARELA_SHU" || s.code === "SUKARELA_REGULER")
+    .reduce((sum, s) => sum + s.balance, 0);
+
+  const formatTransactionLabel = (type: string, savingsTypeCode?: string, savingsTypeName?: string) => {
+    const action = type === "deposit" ? "Setor" : "Tarik";
+    const typeName = savingsTypeCode
+      ? (DISPLAY_NAME_OVERRIDE[savingsTypeCode] ?? savingsTypeName ?? "-")
+      : (savingsTypeName ?? "-");
+    return `${action} - ${typeName}`;
+  };
 
   const formatRupiah = (n: number) =>
     new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
@@ -139,8 +151,8 @@ export default function MemberDashboardPage() {
               <WalletOutlined className="text-2xl text-teal-600" />
             </div>
             <div>
-              <p className="text-sm text-[hsl(var(--muted-foreground))]">Total Simpanan</p>
-              <p className="text-lg font-semibold">{formatRupiah(data.totalSavings)}</p>
+              <p className="text-sm text-[hsl(var(--muted-foreground))]">Dana Yang Bisa Ditarik</p>
+              <p className="text-lg font-semibold">{formatRupiah(withdrawableFunds)}</p>
             </div>
           </div>
         </Card>
@@ -189,7 +201,7 @@ export default function MemberDashboardPage() {
             {data.recentTransactions.map((t) => (
               <li key={t.id} className="flex justify-between text-sm">
                 <span>
-                  {t.type === "deposit" ? "Setor" : "Tarik"} · {t.savings_type ?? "-"}
+                  {formatTransactionLabel(t.type, t.savings_type_code, t.savings_type)}
                 </span>
                 <span className={t.type === "deposit" ? "text-green-600" : "text-red-600"}>
                   {t.type === "deposit" ? "+" : "-"}

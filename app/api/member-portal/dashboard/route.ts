@@ -61,6 +61,7 @@ export async function GET() {
       amount: Number(t.amount),
       date: t.transaction_date,
       savings_type: (t.savings_account as any)?.savings_type?.name,
+      savings_type_code: (t.savings_account as any)?.savings_type?.code,
     }));
 
     const memberInfo = member
