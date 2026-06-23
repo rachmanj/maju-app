@@ -1,5 +1,5 @@
 **Purpose**: AI's persistent knowledge base for project context and learnings
-**Last Updated**: 2026-06-18
+**Last Updated**: 2026-06-23
 
 ## Memory Maintenance Guidelines
 
@@ -26,6 +26,16 @@
 ---
 
 ## Project Memory Entries
+
+### [038] Pengurangan Simpanan Sukarela via Excel (2026-06-23) ✅ COMPLETE
+
+**Challenge**: Need bulk reduction of combined Sukarela (Reguler + SHU) via Excel upload on Simpanan page, with accounting journals and batch tracking.
+
+**Solution**: `SavingsService.reduceSukarela()` deducts REGULER first then SHU in one transaction; rejects row if combined balance insufficient. API `POST /api/savings/sukarela-reduction/upload` parses columns nomor anggota, tanggal transaksi, amount; posts per-portion withdrawal journals with selectable Kas/Bank credit account. UI `SavingsReduceSukarelaExcel` on Simpanan page. Fixed batch delete reversal to sign by `transaction_type` (deposit subtracts, withdrawal adds back).
+
+**Key Learning**: Combined Sukarela reduction spans two accounts but one Excel amount — split in service layer, journal per COA portion (2112 SHU, 2113 Reguler). Batch reversal must be type-aware or withdrawal batches double-subtract balances.
+
+**Files**: `lib/services/savings-service.ts`, `app/api/savings/sukarela-reduction/*`, `components/savings/savings-reduce-sukarela-upload.tsx`, `app/api/savings/batches/[id]/route.ts`
 
 ### [037] Laporan Potongan Gaji includes POS belanja (2026-06-18) ✅ COMPLETE
 

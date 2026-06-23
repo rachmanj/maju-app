@@ -8,11 +8,8 @@ import * as XLSX from 'xlsx';
 
 const COLUMN_ALIASES: Record<string, string[]> = {
   nomor_anggota: ['nomor anggota', 'nik', 'no anggota'],
-  jenis_simpanan: ['jenis simpanan', 'jenis', 'type'],
   tanggal_transaksi: ['tanggal transaksi', 'tanggal', 'date', 'tgl'],
-  nominal: ['nominal', 'jumlah', 'amount', 'nilai'],
-  keterangan: ['keterangan', 'notes', 'catatan'],
-  referensi: ['referensi', 'reference', 'no ref', 'no referensi'],
+  amount: ['amount', 'nominal', 'jumlah', 'nilai'],
 };
 
 function normalizeHeader(h: string): string {
@@ -52,28 +49,33 @@ function parseDate(val: unknown): Date | null {
   return isNaN(d.getTime()) ? null : d;
 }
 
-function resolveSavingsTypeCode(val: unknown): string | null {
-  const s = String(val ?? '').toUpperCase().trim();
-  if (['POKOK', 'WAJIB', 'SUKARELA', 'SUKARELA_SHU', 'SUKARELA_REGULER'].includes(s)) return s;
-  const map: Record<string, string> = {
-    'SIMPANAN POKOK': 'POKOK',
-    'SIMPANAN WAJIB': 'WAJIB',
-    'SIMPANAN SUKARELA': 'SUKARELA',
-    'SIMPANAN SHU': 'SUKARELA_SHU',
-    'SUKARELA REGULER': 'SUKARELA_REGULER',
-    POKOK: 'POKOK',
-    WAJIB: 'WAJIB',
-    SUKARELA: 'SUKARELA',
-    SHU: 'SUKARELA_SHU',
-    REGULER: 'SUKARELA_REGULER',
-  };
-  return map[s] ?? null;
+function isEmptyRow(row: string[]): boolean {
+  return row.every((cell) => String(cell ?? '').trim() === '');
+}
+
+async function resolveMemberId(
+  identifier: string,
+  cache: Map<string, number | null>
+): Promise<number | null> {
+  const cached = cache.get(identifier);
+  if (cached !== undefined) return cached;
+
+  const member = await prisma.members.findFirst({
+    where: {
+      deleted_at: null,
+      OR: [{ nik: identifier }, { member_number: identifier }],
+    },
+    select: { id: true },
+  });
+  const memberId = member ? Number(member.id) : null;
+  cache.set(identifier, memberId);
+  return memberId;
 }
 
 export async function POST(request: NextRequest) {
   try {
     const session = await auth();
-    if (!session || !hasPermission((session.user as any)?.roles || [], PERMISSIONS.SAVINGS_DEPOSIT)) {
+    if (!session || !hasPermission((session.user as any)?.roles || [], PERMISSIONS.SAVINGS_WITHDRAW)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -82,8 +84,8 @@ export async function POST(request: NextRequest) {
     if (!file || !(file instanceof File)) {
       return NextResponse.json({ error: 'File is required' }, { status: 400 });
     }
-    const debitAccountIdStr = formData.get('debit_account_id') as string | null;
-    const debitAccountId = debitAccountIdStr ? parseInt(debitAccountIdStr, 10) : undefined;
+    const creditAccountIdStr = formData.get('credit_account_id') as string | null;
+    const creditAccountId = creditAccountIdStr ? parseInt(creditAccountIdStr, 10) : undefined;
 
     const buf = Buffer.from(await file.arrayBuffer());
     const workbook = XLSX.read(buf, { type: 'buffer' });
@@ -97,17 +99,14 @@ export async function POST(request: NextRequest) {
 
     const headers = rows[0] as string[];
     const colMap = findColumnIndex(headers);
-    if (colMap.nomor_anggota === undefined || colMap.jenis_simpanan === undefined || colMap.nominal === undefined) {
+    if (colMap.nomor_anggota === undefined || colMap.amount === undefined) {
       return NextResponse.json(
         {
-          error: 'Required columns not found. Expected: nomor anggota, jenis simpanan, nominal. Optional: tanggal transaksi, keterangan, referensi',
+          error: 'Required columns not found. Expected: nomor anggota, amount. Optional: tanggal transaksi',
         },
         { status: 400 }
       );
     }
-
-    const savingsTypes = await prisma.savings_types.findMany();
-    const typeByCode = Object.fromEntries(savingsTypes.map((t) => [t.code, t]));
 
     let batchId: number | undefined;
     let batch: { id: bigint } | null = null;
@@ -117,7 +116,7 @@ export async function POST(request: NextRequest) {
         batch = await batchesModel.create({
           data: {
             filename: file.name,
-            batch_type: 'deposit',
+            batch_type: 'sukarela_reduction',
             transaction_count: rows.length - 1,
             success_count: 0,
             failed_count: 0,
@@ -132,87 +131,65 @@ export async function POST(request: NextRequest) {
 
     const results: { row: number; status: 'success' | 'error'; message?: string }[] = [];
     let successCount = 0;
+    const memberCache = new Map<string, number | null>();
 
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i] as string[];
       const rowNum = i + 1;
-      const nik = String(row[colMap.nomor_anggota] ?? '').trim();
-      const jenisVal = row[colMap.jenis_simpanan];
-      const nominalVal = row[colMap.nominal];
-      const tglVal = colMap.tanggal_transaksi !== undefined ? row[colMap.tanggal_transaksi] : null;
-      const keteranganVal = colMap.keterangan !== undefined ? row[colMap.keterangan] : null;
-      const referensiVal = colMap.referensi !== undefined ? row[colMap.referensi] : null;
 
-      if (!nik) {
+      if (isEmptyRow(row)) {
+        continue;
+      }
+
+      const memberIdentifier = String(row[colMap.nomor_anggota] ?? '').trim();
+      const amountVal = row[colMap.amount];
+      const tglVal = colMap.tanggal_transaksi !== undefined ? row[colMap.tanggal_transaksi] : null;
+
+      if (!memberIdentifier) {
         results.push({ row: rowNum, status: 'error', message: 'Nomor anggota kosong' });
         continue;
       }
 
-      const amount = parseAmount(nominalVal);
+      const amount = parseAmount(amountVal);
       if (amount <= 0) {
-        results.push({ row: rowNum, status: 'error', message: 'Nominal harus lebih dari 0' });
+        results.push({ row: rowNum, status: 'error', message: 'Amount harus lebih dari 0' });
         continue;
       }
 
-      const typeCode = resolveSavingsTypeCode(jenisVal);
-      if (!typeCode || !typeByCode[typeCode]) {
-        results.push({ row: rowNum, status: 'error', message: `Jenis simpanan tidak valid: ${jenisVal}` });
+      const memberId = await resolveMemberId(memberIdentifier, memberCache);
+      if (memberId == null) {
+        results.push({ row: rowNum, status: 'error', message: `Anggota tidak ditemukan: ${memberIdentifier}` });
         continue;
-      }
-      const typeId = typeByCode[typeCode].id;
-
-      const member = await prisma.members.findFirst({
-        where: {
-          deleted_at: null,
-          OR: [{ nik: nik }, { member_number: nik }],
-        },
-        select: { id: true },
-      });
-      if (!member) {
-        results.push({ row: rowNum, status: 'error', message: `Anggota tidak ditemukan: ${nik}` });
-        continue;
-      }
-
-      let account = await SavingsService.getSavingsAccount(Number(member.id), typeId);
-      if (!account) {
-        try {
-          const accountId = await SavingsService.createSavingsAccount(Number(member.id), typeId, 0, typeCode);
-          account = await SavingsService.getSavingsAccount(Number(member.id), typeId);
-        } catch (e) {
-          results.push({ row: rowNum, status: 'error', message: `Gagal membuat rekening: ${(e as Error).message}` });
-          continue;
-        }
       }
 
       const transactionDate = parseDate(tglVal) ?? new Date();
-      const notes = keteranganVal != null ? String(keteranganVal).trim() || undefined : undefined;
-      const referenceNumber = referensiVal != null ? String(referensiVal).trim() || undefined : undefined;
 
       try {
-        await SavingsService.deposit(
-          account!.id,
+        const portions = await SavingsService.reduceSukarela(
+          memberId,
           amount,
-          referenceNumber,
-          notes,
-          parseInt(session.user.id),
           transactionDate,
+          undefined,
+          'Pengurangan Sukarela via Excel',
+          parseInt(session.user.id),
           batchId
         );
 
-        try {
-          await JournalService.createSavingsJournal({
-            savingsTypeCode: typeCode,
-            amount,
-            isDeposit: true,
-            referenceNumber,
-            description: notes,
-            createdBy: parseInt(session.user.id),
-            entryDate: transactionDate,
-            uploadBatchId: batchId,
-            debitAccountId: debitAccountId && !isNaN(debitAccountId) ? debitAccountId : undefined,
-          });
-        } catch (je) {
-          console.warn('Auto-journal failed for savings upload row', rowNum, je);
+        for (const portion of portions) {
+          try {
+            await JournalService.createSavingsJournal({
+              savingsTypeCode: portion.typeCode,
+              amount: portion.amount,
+              isDeposit: false,
+              description: 'Pengurangan Sukarela via Excel',
+              createdBy: parseInt(session.user.id),
+              entryDate: transactionDate,
+              uploadBatchId: batchId,
+              debitAccountId: creditAccountId && !isNaN(creditAccountId) ? creditAccountId : undefined,
+            });
+          } catch (je) {
+            console.warn('Auto-journal failed for sukarela reduction row', rowNum, portion.typeCode, je);
+          }
         }
 
         successCount++;
@@ -241,7 +218,7 @@ export async function POST(request: NextRequest) {
       results,
     });
   } catch (error: unknown) {
-    console.error('Savings upload error:', error);
+    console.error('Sukarela reduction upload error:', error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to process upload' },
       { status: 500 }

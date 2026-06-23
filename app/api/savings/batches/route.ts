@@ -1,14 +1,27 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth/config';
 import { hasPermission, PERMISSIONS } from '@/lib/auth/permissions';
 import { prisma } from '@/lib/db/prisma';
 
-export async function GET() {
+const VALID_BATCH_TYPES = ['deposit', 'sukarela_reduction'] as const;
+
+export async function GET(request: NextRequest) {
   try {
     const session = await auth();
-    if (!session || !hasPermission((session.user as any)?.roles || [], PERMISSIONS.SAVINGS_DEPOSIT)) {
+    const roles = (session?.user as any)?.roles || [];
+    const canView =
+      session &&
+      (hasPermission(roles, PERMISSIONS.SAVINGS_DEPOSIT) ||
+        hasPermission(roles, PERMISSIONS.SAVINGS_WITHDRAW));
+    if (!canView) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const typeParam = request.nextUrl.searchParams.get('type');
+    const batchType =
+      typeParam && VALID_BATCH_TYPES.includes(typeParam as (typeof VALID_BATCH_TYPES)[number])
+        ? typeParam
+        : undefined;
 
     const batchesModel = (prisma as any).savings_upload_batches;
     if (!batchesModel) {
@@ -16,6 +29,7 @@ export async function GET() {
     }
 
     const batches = await batchesModel.findMany({
+      where: batchType ? { batch_type: batchType } : undefined,
       orderBy: { uploaded_at: 'desc' },
       include: {
         _count: { select: { savings_transactions: true } },
@@ -25,6 +39,7 @@ export async function GET() {
     const list = batches.map((b: any) => ({
       id: Number(b.id),
       filename: b.filename,
+      batchType: b.batch_type ?? 'deposit',
       transactionCount: b.transaction_count,
       successCount: b.success_count,
       failedCount: b.failed_count,

@@ -142,6 +142,109 @@ export class SavingsService {
     });
   }
 
+  static async reduceSukarela(
+    memberId: number,
+    amount: number,
+    transactionDate?: Date,
+    referenceNumber?: string,
+    notes?: string,
+    createdBy?: number,
+    uploadBatchId?: number
+  ): Promise<{ accountId: number; typeCode: string; amount: number }[]> {
+    const txDate = transactionDate ?? new Date();
+
+    const portions = await prisma.$transaction(async (tx) => {
+      const types = await tx.savings_types.findMany({
+        where: { code: { in: ['SUKARELA_REGULER', 'SUKARELA_SHU'] } },
+        select: { id: true, code: true },
+      });
+      const typeByCode = Object.fromEntries(types.map((t) => [t.code, t]));
+      const regulerType = typeByCode['SUKARELA_REGULER'];
+      const shuType = typeByCode['SUKARELA_SHU'];
+      if (!regulerType || !shuType) {
+        throw new Error('Jenis simpanan Sukarela tidak ditemukan');
+      }
+
+      const accounts = await tx.savings_accounts.findMany({
+        where: {
+          member_id: memberId,
+          closed_date: null,
+          savings_type_id: { in: [regulerType.id, shuType.id] },
+        },
+        include: { savings_type: { select: { code: true } } },
+      });
+
+      const regulerAcc = accounts.find((a) => a.savings_type.code === 'SUKARELA_REGULER');
+      const shuAcc = accounts.find((a) => a.savings_type.code === 'SUKARELA_SHU');
+      const regulerBalance = Number(regulerAcc?.balance ?? 0);
+      const shuBalance = Number(shuAcc?.balance ?? 0);
+      const combinedBalance = regulerBalance + shuBalance;
+
+      if (combinedBalance < amount) {
+        throw new Error(
+          `Saldo Sukarela tidak cukup (tersedia: ${combinedBalance.toLocaleString('id-ID')}, diminta: ${amount.toLocaleString('id-ID')})`
+        );
+      }
+
+      const regulerAmount = Math.min(regulerBalance, amount);
+      const shuAmount = amount - regulerAmount;
+      const planned: { accountId: number; typeCode: string; amount: number }[] = [];
+      if (regulerAmount > 0 && regulerAcc) {
+        planned.push({ accountId: Number(regulerAcc.id), typeCode: 'SUKARELA_REGULER', amount: regulerAmount });
+      }
+      if (shuAmount > 0 && shuAcc) {
+        planned.push({ accountId: Number(shuAcc.id), typeCode: 'SUKARELA_SHU', amount: shuAmount });
+      }
+
+      const plannedTotal = planned.reduce((sum, p) => sum + p.amount, 0);
+      if (plannedTotal !== amount) {
+        throw new Error('Saldo Sukarela tidak cukup');
+      }
+
+      for (const portion of planned) {
+        const acc = await tx.savings_accounts.findUniqueOrThrow({
+          where: { id: portion.accountId },
+          select: { balance: true },
+        });
+        const currentBalance = Number(acc.balance ?? 0);
+        if (currentBalance < portion.amount) {
+          throw new Error('Saldo Sukarela tidak cukup');
+        }
+        const newBalance = currentBalance - portion.amount;
+        await tx.savings_accounts.update({
+          where: { id: portion.accountId },
+          data: { balance: newBalance },
+        });
+        await tx.savings_transactions.create({
+          data: {
+            savings_account_id: portion.accountId,
+            transaction_type: 'withdrawal',
+            amount: portion.amount,
+            balance_before: currentBalance,
+            balance_after: newBalance,
+            transaction_date: txDate,
+            reference_number: referenceNumber ?? null,
+            notes: notes ?? null,
+            created_by: createdBy != null ? BigInt(createdBy) : null,
+            upload_batch_id: uploadBatchId != null ? BigInt(uploadBatchId) : null,
+          },
+        });
+      }
+
+      return planned;
+    });
+
+    await AuditService.log({
+      user_id: createdBy,
+      action: 'savings.reduce_sukarela',
+      entity_type: 'member',
+      entity_id: memberId,
+      new_values: { amount, portions },
+    });
+
+    return portions;
+  }
+
   static async withdraw(
     accountId: number,
     amount: number,

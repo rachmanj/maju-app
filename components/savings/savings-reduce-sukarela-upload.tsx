@@ -1,12 +1,11 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useSession } from "next-auth/react";
 import { Button, Modal, Upload, App, Table, Select } from "antd";
-import { UploadOutlined, DownloadOutlined, DeleteOutlined } from "@ant-design/icons";
+import { UploadOutlined, DownloadOutlined, DeleteOutlined, MinusCircleOutlined } from "@ant-design/icons";
 import type { UploadProps } from "antd";
 
-interface DebitAccount {
+interface CreditAccount {
   id: number;
   code: string;
   name: string;
@@ -28,18 +27,14 @@ interface Batch {
   actualTransactionCount: number;
 }
 
-export function SavingsUploadExcel() {
+export function SavingsReduceSukarelaExcel() {
   const { message } = App.useApp();
-  const { data: session } = useSession();
-  const roles = (session?.user as { roles?: string[] })?.roles ?? [];
-  const canClearAll = roles.includes("superadmin") || roles.includes("manager");
   const [modalOpen, setModalOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [clearing, setClearing] = useState(false);
   const [deletingBatchId, setDeletingBatchId] = useState<number | null>(null);
   const [batches, setBatches] = useState<Batch[]>([]);
-  const [debitAccounts, setDebitAccounts] = useState<DebitAccount[]>([]);
-  const [debitAccountId, setDebitAccountId] = useState<number | undefined>(undefined);
+  const [creditAccounts, setCreditAccounts] = useState<CreditAccount[]>([]);
+  const [creditAccountId, setCreditAccountId] = useState<number | undefined>(undefined);
   const [result, setResult] = useState<{
     successCount: number;
     failedCount: number;
@@ -48,7 +43,7 @@ export function SavingsUploadExcel() {
 
   const fetchBatches = useCallback(async () => {
     try {
-      const res = await fetch("/api/savings/batches?type=deposit");
+      const res = await fetch("/api/savings/batches?type=sukarela_reduction");
       const data = await res.json();
       if (res.ok) setBatches(data.batches ?? []);
     } catch {
@@ -56,47 +51,22 @@ export function SavingsUploadExcel() {
     }
   }, []);
 
-  const fetchDebitAccounts = useCallback(async () => {
+  const fetchCreditAccounts = useCallback(async () => {
     try {
       const res = await fetch("/api/savings/debit-accounts");
       const data = await res.json();
-      if (res.ok) setDebitAccounts(data ?? []);
+      if (res.ok) setCreditAccounts(data ?? []);
     } catch {
-      setDebitAccounts([]);
+      setCreditAccounts([]);
     }
   }, []);
 
   useEffect(() => {
     if (modalOpen) {
       fetchBatches();
-      fetchDebitAccounts();
+      fetchCreditAccounts();
     }
-  }, [modalOpen, fetchBatches, fetchDebitAccounts]);
-
-  const handleClear = async () => {
-    Modal.confirm({
-      title: "Hapus Semua Transaksi Simpanan?",
-      content: "Semua transaksi simpanan akan dihapus, saldo rekening direset ke 0, dan jurnal terkait dihapus. Tindakan ini tidak dapat dibatalkan.",
-      okText: "Ya, Hapus",
-      okType: "danger",
-      cancelText: "Batal",
-      onOk: async () => {
-        setClearing(true);
-        try {
-          const res = await fetch("/api/savings/clear-transactions", { method: "POST" });
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.error || "Gagal menghapus");
-          message.success(data.message ?? "Transaksi simpanan telah dihapus");
-          setResult(null);
-          fetchBatches();
-        } catch (e) {
-          message.error((e as Error).message);
-        } finally {
-          setClearing(false);
-        }
-      },
-    });
-  };
+  }, [modalOpen, fetchBatches, fetchCreditAccounts]);
 
   const handleDeleteBatch = (batch: Batch) => {
     Modal.confirm({
@@ -131,10 +101,10 @@ export function SavingsUploadExcel() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      if (debitAccountId != null) {
-        formData.append("debit_account_id", String(debitAccountId));
+      if (creditAccountId != null) {
+        formData.append("credit_account_id", String(creditAccountId));
       }
-      const res = await fetch("/api/savings/upload", {
+      const res = await fetch("/api/savings/sukarela-reduction/upload", {
         method: "POST",
         body: formData,
       });
@@ -169,11 +139,11 @@ export function SavingsUploadExcel() {
 
   return (
     <>
-      <Button icon={<UploadOutlined />} onClick={() => setModalOpen(true)}>
-        Upload Excel
+      <Button icon={<MinusCircleOutlined />} onClick={() => setModalOpen(true)}>
+        Pengurangan Sukarela (Excel)
       </Button>
       <Modal
-        title="Upload Transaksi Simpanan (Excel)"
+        title="Pengurangan Simpanan Sukarela (Excel)"
         open={modalOpen}
         onCancel={() => {
           setModalOpen(false);
@@ -232,44 +202,36 @@ export function SavingsUploadExcel() {
           )}
           <p className="text-sm text-muted-foreground">
             Format Excel: Baris pertama header. Kolom wajib: <strong>nomor anggota</strong>,{" "}
-            <strong>jenis simpanan</strong> (POKOK/WAJIB/SUKARELA/SHU/REGULER), <strong>nominal</strong>. Opsional: tanggal
-            transaksi, keterangan, referensi.
+            <strong>amount</strong>. Opsional: <strong>tanggal transaksi</strong>.
+            Satu anggota boleh muncul di banyak baris; setiap baris diproses berurutan sebagai pengurangan terpisah.
+            Pengurangan per baris dilakukan dari Simpanan Sukarela Reguler terlebih dahulu, kemudian Simpanan Sukarela SHU
+            jika masih ada sisa.
           </p>
           <div className="mb-4">
-            <label className="block text-sm font-medium mb-1">Akun Debit (Kas/Bank)</label>
+            <label className="block text-sm font-medium mb-1">Akun Kas/Bank (Kredit)</label>
             <Select
               className="w-full"
               placeholder="Pilih akun Kas atau Bank (default: Kas di Kasir)"
               allowClear
               showSearch
               optionFilterProp="label"
-              options={debitAccounts.map((a) => ({
+              options={creditAccounts.map((a) => ({
                 value: a.id,
                 label: `${a.code} - ${a.name}`,
               }))}
-              value={debitAccountId}
-              onChange={(v) => setDebitAccountId(v ?? undefined)}
+              value={creditAccountId}
+              onChange={(v) => setCreditAccountId(v ?? undefined)}
             />
           </div>
           <div className="flex gap-2 mb-2">
             <Button
               icon={<DownloadOutlined />}
-              href="/api/savings/upload/template"
-              download="template_simpanan.xlsx"
+              href="/api/savings/sukarela-reduction/template"
+              download="template_pengurangan_sukarela.xlsx"
               target="_blank"
             >
               Unduh Template
             </Button>
-            {canClearAll && (
-              <Button
-                danger
-                icon={<DeleteOutlined />}
-                onClick={handleClear}
-                loading={clearing}
-              >
-                Hapus Semua Transaksi
-              </Button>
-            )}
           </div>
           <Upload.Dragger
             name="file"

@@ -2,7 +2,21 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth/config';
 import { SavingsService } from '@/lib/services/savings-service';
 import { prisma } from '@/lib/db/prisma';
-import type { SavingsAccount, SavingsTransaction } from '@/types/database';
+import type { SavingsTransaction } from '@/types/database';
+
+const CATEGORY_TYPE_CODES: Record<string, string[]> = {
+  sukarela: ['SUKARELA_REGULER', 'SUKARELA_SHU', 'SUKARELA'],
+  pokok_wajib: ['POKOK', 'WAJIB'],
+};
+
+const DISPLAY_NAME_OVERRIDE: Record<string, string> = {
+  SUKARELA_REGULER: 'Simpanan Sukarela',
+};
+
+function displaySavingsTypeName(code?: string | null, name?: string | null): string | undefined {
+  if (!code) return name ?? undefined;
+  return DISPLAY_NAME_OVERRIDE[code] ?? name ?? undefined;
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,35 +27,58 @@ export async function GET(request: NextRequest) {
     }
 
     const accountId = request.nextUrl.searchParams.get('accountId');
+    const category = request.nextUrl.searchParams.get('category') ?? 'sukarela';
     const page = parseInt(request.nextUrl.searchParams.get('page') || '1');
     const limit = parseInt(request.nextUrl.searchParams.get('limit') || '20');
 
     if (!accountId) {
-      const accounts = await SavingsService.getMemberSavingsAccounts(memberId);
-      const allTx: { id: number; account_id: number; type: string; amount: number; date: Date; balance_after: number; savings_type_name?: string }[] = [];
-      for (const acc of accounts) {
-        const { transactions } = await SavingsService.getTransactionHistory(acc.id, 1, 50);
-        for (const t of transactions) {
-          allTx.push({
-            id: t.id,
-            account_id: acc.id,
-            type: t.transaction_type,
-            amount: Number(t.amount),
-            date: t.transaction_date,
-            balance_after: Number(t.balance_after),
-            savings_type_name: (acc as SavingsAccount & { savings_type_name?: string }).savings_type_name,
-          });
-        }
-      }
-      allTx.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      const start = (page - 1) * limit;
-      const paginated = allTx.slice(start, start + limit);
-      return NextResponse.json({ transactions: paginated, total: allTx.length });
+      const typeCodes = CATEGORY_TYPE_CODES[category] ?? CATEGORY_TYPE_CODES.sukarela;
+      const where = {
+        savings_account: {
+          member_id: BigInt(memberId),
+          closed_date: null,
+          savings_type: { code: { in: typeCodes } },
+        },
+      };
+
+      const [transactions, total] = await Promise.all([
+        prisma.savings_transactions.findMany({
+          where,
+          include: {
+            savings_account: {
+              include: { savings_type: { select: { code: true, name: true } } },
+            },
+          },
+          orderBy: [{ transaction_date: 'desc' }, { created_at: 'desc' }],
+          skip: (page - 1) * limit,
+          take: limit,
+        }),
+        prisma.savings_transactions.count({ where }),
+      ]);
+
+      return NextResponse.json({
+        transactions: transactions.map((t) => ({
+          id: Number(t.id),
+          account_id: Number(t.savings_account_id),
+          type: t.transaction_type,
+          amount: Number(t.amount),
+          date: t.transaction_date,
+          balance_after: Number(t.balance_after),
+          savings_type_code: t.savings_account.savings_type.code,
+          savings_type_name: displaySavingsTypeName(
+            t.savings_account.savings_type.code,
+            t.savings_account.savings_type.name
+          ),
+          notes: t.notes,
+        })),
+        total,
+      });
     }
 
     const accId = parseInt(accountId);
     const account = await prisma.savings_accounts.findFirst({
       where: { id: accId, member_id: memberId },
+      include: { savings_type: { select: { code: true, name: true } } },
     });
     if (!account) {
       return NextResponse.json({ error: 'Account not found' }, { status: 404 });
@@ -56,6 +93,8 @@ export async function GET(request: NextRequest) {
         date: t.transaction_date,
         balance_before: Number(t.balance_before),
         balance_after: Number(t.balance_after),
+        savings_type_code: account.savings_type.code,
+        savings_type_name: displaySavingsTypeName(account.savings_type.code, account.savings_type.name),
         notes: t.notes,
       })),
       total,

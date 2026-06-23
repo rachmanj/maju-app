@@ -36,7 +36,8 @@ export async function DELETE(
     for (const t of batch.savings_transactions) {
       const amt = Number(t.amount);
       const current = accountDeltas.get(t.savings_account_id) ?? 0;
-      accountDeltas.set(t.savings_account_id, current + amt);
+      const delta = t.transaction_type === 'withdrawal' ? -amt : amt;
+      accountDeltas.set(t.savings_account_id, current + delta);
     }
 
     await prisma.$transaction(async (tx) => {
