@@ -23,7 +23,8 @@ interface MemberInfo {
 interface DashboardData {
   member: MemberInfo | null;
   totalSavings: number;
-  savingsByType: { code: string; name: string; balance: number }[];
+  savingsByType: { code: string; name: string; balance: number; totalDeposits: number }[];
+  totalWithdrawals: number;
   totalOutstanding: number;
   activeLoansCount: number;
   recentTransactions: { id: number; type: string; amount: number; date: string; savings_type?: string; savings_type_code?: string }[];
@@ -65,12 +66,15 @@ export default function MemberDashboardPage() {
     SUKARELA_REGULER: "Simpanan Sukarela",
   };
 
+  const DEPOSIT_TOTAL_TYPES = new Set(["SUKARELA_SHU", "SUKARELA_REGULER"]);
+
   const savingsByType = data.savingsByType
     .filter((s) => s.code !== "SUKARELA")
     .sort((a, b) => TYPE_DISPLAY_ORDER.indexOf(a.code) - TYPE_DISPLAY_ORDER.indexOf(b.code))
     .map((s) => ({
       ...s,
       name: DISPLAY_NAME_OVERRIDE[s.code] ?? s.name,
+      displayAmount: DEPOSIT_TOTAL_TYPES.has(s.code) ? s.totalDeposits : s.balance,
     }));
 
   const withdrawableFunds = data.savingsByType
@@ -87,6 +91,13 @@ export default function MemberDashboardPage() {
 
   const formatRupiah = (n: number) =>
     new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
+
+  const formatDate = (v: string) =>
+    new Date(v).toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
 
   const getStatusLabel = (s: string | null) => {
     const map: Record<string, string> = {
@@ -123,9 +134,7 @@ export default function MemberDashboardPage() {
             <Descriptions.Item label="Telepon">{data.member.phone || "-"}</Descriptions.Item>
             <Descriptions.Item label="Jabatan">{data.member.job_title || "-"}</Descriptions.Item>
             <Descriptions.Item label="Tanggal Bergabung">
-              {data.member.joined_date
-                ? new Date(data.member.joined_date).toLocaleDateString("id-ID")
-                : "-"}
+              {data.member.joined_date ? formatDate(data.member.joined_date) : "-"}
             </Descriptions.Item>
             <Descriptions.Item label="Proyek">
               {data.member.project_name
@@ -185,12 +194,23 @@ export default function MemberDashboardPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <Card title="Simpanan per Jenis" className="shadow-sm">
           <ul className="space-y-2">
-            {savingsByType.map((s) => (
-              <li key={s.code} className="flex justify-between">
-                <span className="text-[hsl(var(--foreground))]/80">{s.name}</span>
-                <span className="font-medium">{formatRupiah(s.balance)}</span>
-              </li>
-            ))}
+            {savingsByType.flatMap((s) => {
+              const rows = [
+                <li key={s.code} className="flex justify-between">
+                  <span className="text-[hsl(var(--foreground))]/80">{s.name}</span>
+                  <span className="font-medium">{formatRupiah(s.displayAmount)}</span>
+                </li>,
+              ];
+              if (s.code === "SUKARELA_REGULER") {
+                rows.push(
+                  <li key="total-withdrawals" className="flex justify-between">
+                    <span className="text-[hsl(var(--foreground))]/80">Penarikan Simpanan</span>
+                    <span className="font-medium text-red-600">{formatRupiah(data.totalWithdrawals)}</span>
+                  </li>
+                );
+              }
+              return rows;
+            })}
             {savingsByType.length === 0 && (
               <li className="text-[hsl(var(--muted-foreground))]">Belum ada simpanan</li>
             )}

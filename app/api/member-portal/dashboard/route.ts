@@ -13,7 +13,7 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const [member, accounts, recentTransactions] = await Promise.all([
+    const [member, accounts, recentTransactions, depositAggregates, withdrawalAggregate] = await Promise.all([
       prisma.members.findFirst({
         where: { id: memberId, deleted_at: null },
         select: {
@@ -43,7 +43,36 @@ export async function GET() {
           },
         },
       }),
+      prisma.savings_transactions.groupBy({
+        by: ['savings_account_id'],
+        where: {
+          transaction_type: 'deposit',
+          savings_account: { member_id: memberId },
+        },
+        _sum: { amount: true },
+      }),
+      prisma.savings_transactions.aggregate({
+        where: {
+          transaction_type: 'withdrawal',
+          savings_account: { member_id: memberId },
+        },
+        _sum: { amount: true },
+      }),
     ]);
+
+    const accountTypeById = new Map(
+      accounts.map((a: SavingsAccount & { savings_type_code?: string }) => [
+        Number(a.id),
+        a.savings_type_code ?? '',
+      ])
+    );
+    const totalDepositsByType: Record<string, number> = {};
+    for (const row of depositAggregates) {
+      const code = accountTypeById.get(Number(row.savings_account_id));
+      if (!code) continue;
+      totalDepositsByType[code] = (totalDepositsByType[code] ?? 0) + Number(row._sum.amount ?? 0);
+    }
+    const totalWithdrawals = Number(withdrawalAggregate._sum.amount ?? 0);
 
     const totalSavings = accounts.reduce((sum: number, a: SavingsAccount) => sum + Number(a.balance), 0);
     const { loans } = await LoanService.listLoans({ member_id: memberId, limit: 100 });
@@ -89,7 +118,9 @@ export async function GET() {
         code: a.savings_type_code,
         name: a.savings_type_name,
         balance: Number(a.balance),
+        totalDeposits: totalDepositsByType[a.savings_type_code ?? ''] ?? 0,
       })),
+      totalWithdrawals,
       totalOutstanding,
       activeLoansCount: outstandingLoans.length,
       recentTransactions: recent,
