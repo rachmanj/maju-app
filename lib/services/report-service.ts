@@ -89,7 +89,7 @@ export class ReportService {
     };
   }
 
-  static async getPayrollDeductionReport(month: string): Promise<{
+  static async getPayrollDeductionReport(fromDate: string, toDate: string): Promise<{
     members: {
       member_id: number;
       nik: string;
@@ -105,16 +105,18 @@ export class ReportService {
       total_pos_purchase: number;
       total: number;
     };
+    period: { from_date: string; to_date: string };
   }> {
-    const monthDate = new Date(month + '-01');
-    const dueYear = monthDate.getFullYear();
-    const dueMonth = monthDate.getMonth() + 1;
-    const [startDate, endDate] = [
-      `${month}-01`,
-      new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0)
-        .toISOString()
-        .split('T')[0],
-    ];
+    const startDate = fromDate;
+    const endDate = toDate;
+    const endDateTime = new Date(`${toDate}T23:59:59.999`);
+    const startYear = new Date(fromDate).getFullYear();
+    const startMonth = new Date(fromDate).getMonth() + 1;
+    const endYear = new Date(toDate).getFullYear();
+    const endMonth = new Date(toDate).getMonth() + 1;
+    const startYearMonth = startYear * 12 + startMonth;
+    const endYearMonth = endYear * 12 + endMonth;
+    const monthsInRange = Math.max(1, endYearMonth - startYearMonth + 1);
 
     const rows = await prisma.$queryRaw<
       {
@@ -147,12 +149,14 @@ export class ReportService {
           GROUP BY l.member_id
         ) loan ON loan.member_id = m.id
         LEFT JOIN (
-          SELECT mr.member_id, SUM(mr.amount) as amount
-          FROM member_receivables mr
-          WHERE mr.status = 'pending'
-            AND mr.due_year = ${dueYear}
-            AND mr.due_month = ${dueMonth}
-          GROUP BY mr.member_id
+          SELECT pt.member_id, SUM(pt.total_amount) as amount
+          FROM pos_transactions pt
+          JOIN pos_payments pp ON pp.pos_transaction_id = pt.id
+          WHERE pp.payment_method = 'potong_gaji'
+            AND pt.status = 'completed'
+            AND pt.transaction_date >= ${new Date(startDate)}
+            AND pt.transaction_date <= ${endDateTime}
+          GROUP BY pt.member_id
         ) pos ON pos.member_id = m.id
         WHERE m.status = 'active' AND m.deleted_at IS NULL
       ) x
@@ -161,7 +165,7 @@ export class ReportService {
     `);
 
     const members = rows.map((r) => {
-      const sw = Number(r.simpanan_wajib ?? 0);
+      const sw = Number(r.simpanan_wajib ?? 0) * monthsInRange;
       const inst = Number(r.loan_installment ?? 0);
       const pos = Number(r.pos_purchase ?? 0);
       return {
@@ -185,7 +189,11 @@ export class ReportService {
       { total_simpanan_wajib: 0, total_loan_installment: 0, total_pos_purchase: 0, total: 0 }
     );
 
-    return { members, summary };
+    return {
+      members,
+      summary,
+      period: { from_date: fromDate, to_date: toDate },
+    };
   }
 
   static async getBalanceSheet(asOfDate: string): Promise<{

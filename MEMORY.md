@@ -1,5 +1,5 @@
 **Purpose**: AI's persistent knowledge base for project context and learnings
-**Last Updated**: 2026-06-23
+**Last Updated**: 2026-06-29
 
 ## Memory Maintenance Guidelines
 
@@ -26,6 +26,14 @@
 ---
 
 ## Project Memory Entries
+
+### [039] Potongan Gaji date range & Excel export (2026-06-29) ✅ COMPLETE
+
+**Challenge**: Tab Potongan Gaji used single-month picker; users need arbitrary date ranges and Excel export for payroll coordination.
+
+**Solution**: Replaced month picker with `DatePicker.RangePicker` (default: current month). API accepts `from_date`/`to_date`; `ReportService.getPayrollDeductionReport` filters loan schedules by due date range, POS by `potong_gaji` transaction date in range (not receivable due month), and scales Simpanan Wajib by month count. New `GET /api/accounting/reports/payroll-deduction/export` generates `.xlsx` with detail rows and totals.
+
+**Key Learning**: Potong Gaji checkout creates receivables due *next* month — payroll report must sum `pos_transactions` by `transaction_date`, not `member_receivables.due_month`.
 
 ### [038] Pengurangan Simpanan Sukarela via Excel (2026-06-23) ✅ COMPLETE
 

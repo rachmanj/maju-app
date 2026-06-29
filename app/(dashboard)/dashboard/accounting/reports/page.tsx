@@ -5,7 +5,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Card, Table, DatePicker, Select, Button, Tabs, Space } from "antd";
 import { App } from "antd";
 import type { ColumnsType } from "antd/es/table";
+import { FileExcelOutlined } from "@ant-design/icons";
 import { format } from "date-fns";
+import dayjs, { Dayjs } from "dayjs";
 
 const REPORT_TABS = new Set([
   "trial-balance",
@@ -29,7 +31,10 @@ function AccountingReportsContent() {
   );
   const [toDate, setToDate] = useState<string>(format(new Date(), "yyyy-MM-dd"));
   const [accountId, setAccountId] = useState<number | undefined>(undefined);
-  const [month, setMonth] = useState<string>(format(new Date(), "yyyy-MM"));
+  const [payrollRange, setPayrollRange] = useState<[Dayjs | null, Dayjs | null]>([
+    dayjs().startOf("month"),
+    dayjs().endOf("month"),
+  ]);
   const [trialData, setTrialData] = useState<any[]>([]);
   const [glData, setGlData] = useState<any>(null);
   const [payrollData, setPayrollData] = useState<any>(null);
@@ -88,10 +93,17 @@ function AccountingReportsContent() {
   };
 
   const loadPayrollDeduction = async () => {
+    const [from, to] = payrollRange;
+    if (!from || !to) {
+      message.warning("Pilih rentang tanggal");
+      return;
+    }
     try {
       setLoading(true);
+      const fromStr = from.format("YYYY-MM-DD");
+      const toStr = to.format("YYYY-MM-DD");
       const res = await fetch(
-        `/api/accounting/reports/payroll-deduction?month=${month}`
+        `/api/accounting/reports/payroll-deduction?from_date=${fromStr}&to_date=${toStr}`
       );
       if (!res.ok) throw new Error("Failed");
       const data = await res.json();
@@ -101,6 +113,19 @@ function AccountingReportsContent() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const exportPayrollDeduction = () => {
+    const [from, to] = payrollRange;
+    if (!from || !to) {
+      message.warning("Pilih rentang tanggal");
+      return;
+    }
+    const params = new URLSearchParams({
+      from_date: from.format("YYYY-MM-DD"),
+      to_date: to.format("YYYY-MM-DD"),
+    });
+    window.open(`/api/accounting/reports/payroll-deduction/export?${params}`, "_blank");
   };
 
   const loadBalanceSheet = async () => {
@@ -138,8 +163,6 @@ function AccountingReportsContent() {
   const fmt = (n: number) => new Intl.NumberFormat("id-ID").format(n);
   const toDateStr = (d: any) =>
     d?.format?.("YYYY-MM-DD") ?? format(new Date(d?.toString() ?? ""), "yyyy-MM-dd");
-  const toMonthStr = (d: any) =>
-    d?.format?.("YYYY-MM") ?? format(new Date(d?.toString() ?? ""), "yyyy-MM");
 
   const trialColumns: ColumnsType<any> = [
     { title: "Kode", dataIndex: "code", key: "code", width: 100 },
@@ -289,15 +312,19 @@ function AccountingReportsContent() {
                 <div className="space-y-4">
                   <div className="flex flex-wrap items-end gap-4">
                     <div>
-                      <label className="mb-1 block text-sm">Bulan</label>
-                      <DatePicker
-                        picker="month"
-                        format="MM/YYYY"
-                        onChange={(d) => d && setMonth(toMonthStr(d))}
+                      <label className="mb-1 block text-sm">Periode</label>
+                      <DatePicker.RangePicker
+                        value={payrollRange[0] && payrollRange[1] ? [payrollRange[0], payrollRange[1]] : null}
+                        onChange={(d) => setPayrollRange(d ? [d[0], d[1]] : [null, null])}
+                        format="DD/MM/YYYY"
+                        allowClear={false}
                       />
                     </div>
                     <Button type="primary" onClick={loadPayrollDeduction} loading={loading}>
                       Tampilkan
+                    </Button>
+                    <Button icon={<FileExcelOutlined />} onClick={exportPayrollDeduction}>
+                      Ekspor Excel
                     </Button>
                   </div>
                   {payrollData && (
