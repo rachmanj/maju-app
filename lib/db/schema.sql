@@ -1045,3 +1045,20 @@ CREATE TABLE IF NOT EXISTS product_upload_batches (
 
 ALTER TABLE products ADD COLUMN upload_batch_id BIGINT NULL AFTER updated_by;
 ALTER TABLE products ADD CONSTRAINT fk_products_upload_batch FOREIGN KEY (upload_batch_id) REFERENCES product_upload_batches(id) ON DELETE SET NULL;
+
+-- Savings upload batches (for Excel batch upload)
+CREATE TABLE IF NOT EXISTS savings_upload_batches (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    filename VARCHAR(255) NULL,
+    batch_type VARCHAR(50) NOT NULL DEFAULT 'deposit',
+    transaction_count INT DEFAULT 0,
+    success_count INT DEFAULT 0,
+    failed_count INT DEFAULT 0,
+    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    uploaded_by BIGINT NULL,
+    INDEX idx_batch_type (batch_type)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+ALTER TABLE savings_transactions ADD COLUMN upload_batch_id BIGINT NULL AFTER created_by;
+ALTER TABLE savings_transactions ADD CONSTRAINT fk_savings_tx_upload_batch FOREIGN KEY (upload_batch_id) REFERENCES savings_upload_batches(id) ON DELETE SET NULL;
+ALTER TABLE savings_upload_batches ADD COLUMN batch_type VARCHAR(50) NOT NULL DEFAULT 'deposit' AFTER filename;

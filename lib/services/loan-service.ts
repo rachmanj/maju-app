@@ -5,7 +5,24 @@ import { LoanCalculator } from '../utils/loan-calculator';
 import { AuditService } from './audit-service';
 import { JournalService } from './journal-service';
 
+type PrismaTx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+
 export class LoanService {
+  static async generateLoanNumber(tx?: PrismaTx): Promise<string> {
+    const client = tx ?? prisma;
+    const year = new Date().getFullYear();
+    const prefix = `LOAN${year}`;
+    const last = await client.loans.findFirst({
+      where: { loan_number: { startsWith: prefix } },
+      orderBy: { loan_number: 'desc' },
+      select: { loan_number: true },
+    });
+    const nextNum = last
+      ? parseInt(last.loan_number.slice(prefix.length), 10) + 1
+      : 1;
+    return `${prefix}${nextNum.toString().padStart(6, '0')}`;
+  }
+
   static async createApplication(data: {
     member_id: number;
     requested_amount: number;
@@ -37,84 +54,112 @@ export class LoanService {
       disbursed_date?: Date;
     }
   ): Promise<number> {
-    const loan = await prisma.$transaction(async (tx) => {
-      const app = await tx.loan_applications.findUniqueOrThrow({ where: { id: applicationId } });
-      const principal = Number(app.requested_amount);
-      const term = app.requested_term_months;
+    const maxRetries = 5;
+    let loan: Awaited<ReturnType<PrismaTx['loans']['create']>> | undefined;
 
-      await tx.loan_applications.update({
-        where: { id: applicationId },
-        data: { status: 'approved', approved_at: new Date(), approved_by: BigInt(data.approved_by) },
-      });
-      const loanCount = await tx.loans.count();
-      const loanNumber = `LOAN${new Date().getFullYear()}${(loanCount + 1).toString().padStart(6, '0')}`;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        loan = await prisma.$transaction(async (tx) => {
+          const app = await tx.loan_applications.findUniqueOrThrow({ where: { id: applicationId } });
 
-      let schedules: { installmentNumber: number; dueDate: Date; installmentAmount: number; principalAmount: number; interestAmount: number }[];
-      let interestRate: number;
-      let interestMethod: string;
+          if (app.status !== 'pending') {
+            const existingLoan = await tx.loans.findFirst({
+              where: { loan_application_id: applicationId },
+            });
+            if (existingLoan) return existingLoan;
+            throw new Error(`Pengajuan sudah ${app.status ?? 'diproses'}`);
+          }
 
-      if (data.interest_method === 'manual' && data.monthly_amount != null) {
-        const calc = LoanCalculator.calculateManualAmount({
-          principalAmount: principal,
-          termMonths: term,
-          monthlyAmount: data.monthly_amount,
+          const principal = Number(app.requested_amount);
+          const term = app.requested_term_months;
+
+          await tx.loan_applications.update({
+            where: { id: applicationId },
+            data: { status: 'approved', approved_at: new Date(), approved_by: BigInt(data.approved_by) },
+          });
+          const loanNumber = await LoanService.generateLoanNumber(tx);
+
+          let schedules: { installmentNumber: number; dueDate: Date; installmentAmount: number; principalAmount: number; interestAmount: number }[];
+          let interestRate: number;
+          let interestMethod: string;
+
+          if (data.interest_method === 'manual' && data.monthly_amount != null) {
+            const calc = LoanCalculator.calculateManualAmount({
+              principalAmount: principal,
+              termMonths: term,
+              monthlyAmount: data.monthly_amount,
+            });
+            schedules = calc.schedules;
+            interestRate = calc.totalInterest > 0 ? (calc.totalInterest / principal) * 100 : 0;
+            interestMethod = 'manual';
+          } else if (data.interest_method === 'flat' && data.interest_rate != null) {
+            const calc = LoanCalculator.calculateFlatRate({
+              principalAmount: principal,
+              interestRate: data.interest_rate,
+              termMonths: term,
+            });
+            schedules = calc.schedules;
+            interestRate = data.interest_rate;
+            interestMethod = 'flat';
+          } else {
+            const rate = data.interest_rate ?? 0;
+            const calc = LoanCalculator.calculateFlatTotalRate({
+              principalAmount: principal,
+              interestRateTotal: rate,
+              termMonths: term,
+            });
+            schedules = calc.schedules;
+            interestRate = rate;
+            interestMethod = 'flat_total';
+          }
+
+          const l = await tx.loans.create({
+            data: {
+              member_id: app.member_id,
+              loan_application_id: applicationId,
+              loan_number: loanNumber,
+              principal_amount: app.requested_amount,
+              interest_rate: interestRate,
+              interest_method: interestMethod,
+              term_months: app.requested_term_months,
+              status: 'approved',
+              approved_date: new Date(),
+              disbursed_date: data.disbursed_date ?? new Date(),
+              created_by: BigInt(data.approved_by),
+            },
+          });
+          for (const schedule of schedules) {
+            await tx.loan_schedules.create({
+              data: {
+                loan_id: l.id,
+                installment_number: schedule.installmentNumber,
+                due_date: schedule.dueDate,
+                original_due_date: schedule.dueDate,
+                installment_amount: schedule.installmentAmount,
+                principal_amount: schedule.principalAmount,
+                interest_amount: schedule.interestAmount,
+                status: 'pending',
+                is_manual_amount: interestMethod === 'manual',
+              },
+            });
+          }
+          return l;
         });
-        schedules = calc.schedules;
-        interestRate = calc.totalInterest > 0 ? (calc.totalInterest / principal) * 100 : 0;
-        interestMethod = 'manual';
-      } else if (data.interest_method === 'flat' && data.interest_rate != null) {
-        const calc = LoanCalculator.calculateFlatRate({
-          principalAmount: principal,
-          interestRate: data.interest_rate,
-          termMonths: term,
-        });
-        schedules = calc.schedules;
-        interestRate = data.interest_rate;
-        interestMethod = 'flat';
-      } else {
-        const rate = data.interest_rate ?? 0;
-        const calc = LoanCalculator.calculateFlatTotalRate({
-          principalAmount: principal,
-          interestRateTotal: rate,
-          termMonths: term,
-        });
-        schedules = calc.schedules;
-        interestRate = rate;
-        interestMethod = 'flat_total';
+        break;
+      } catch (error: unknown) {
+        const code = (error as { code?: string })?.code;
+        const msg = error instanceof Error ? error.message : '';
+        const isUniqueError =
+          code === 'P2002' || msg.includes('Unique constraint') || msg.includes('loans_loan_number_key');
+        if (isUniqueError && attempt < maxRetries - 1) continue;
+        throw error;
       }
+    }
 
-      const l = await tx.loans.create({
-        data: {
-          member_id: app.member_id,
-          loan_application_id: applicationId,
-          loan_number: loanNumber,
-          principal_amount: app.requested_amount,
-          interest_rate: interestRate,
-          interest_method: interestMethod,
-          term_months: app.requested_term_months,
-          status: 'approved',
-          approved_date: new Date(),
-          disbursed_date: data.disbursed_date ?? new Date(),
-          created_by: BigInt(data.approved_by),
-        },
-      });
-      for (const schedule of schedules) {
-        await tx.loan_schedules.create({
-          data: {
-            loan_id: l.id,
-            installment_number: schedule.installmentNumber,
-            due_date: schedule.dueDate,
-            original_due_date: schedule.dueDate,
-            installment_amount: schedule.installmentAmount,
-            principal_amount: schedule.principalAmount,
-            interest_amount: schedule.interestAmount,
-            status: 'pending',
-            is_manual_amount: interestMethod === 'manual',
-          },
-        });
-      }
-      return l;
-    });
+    if (!loan) {
+      throw new Error('Gagal membuat pinjaman setelah beberapa percobaan');
+    }
+
     await AuditService.log({
       user_id: data.approved_by,
       action: 'loan.approve',
@@ -519,8 +564,7 @@ export class LoanService {
     }
 
     const loan = await prisma.$transaction(async (tx) => {
-      const loanCount = await tx.loans.count();
-      const loanNumber = `LOAN${new Date().getFullYear()}${(loanCount + 1).toString().padStart(6, '0')}`;
+      const loanNumber = await LoanService.generateLoanNumber(tx);
 
       const l = await tx.loans.create({
         data: {

@@ -1,5 +1,5 @@
 **Purpose**: AI's persistent knowledge base for project context and learnings
-**Last Updated**: 2026-06-29
+**Last Updated**: 2026-07-03
 
 ## Memory Maintenance Guidelines
 
@@ -26,6 +26,16 @@
 ---
 
 ## Project Memory Entries
+
+### [040] Savings upload batch_type missing & orphan undo (2026-07-03) ✅ COMPLETE
+
+**Challenge**: Excel uploads on Simpanan page created transactions but no batch record — UI "Hapus" batch undo was unavailable. Root cause: `savings_upload_batches.batch_type` column existed in Prisma schema but not in DB, causing silent batch-create failure in upload routes.
+
+**Solution**: Added `savings_upload_batches` + `batch_type` + `upload_batch_id` to `lib/db/schema.sql` and migrated. Reversed orphaned upload (388 deposit txs, 388 journals, 194 accounts) via new `scripts/undo-savings-upload-window.ts` using same balance-reversal logic as batch delete. Future uploads will now appear in modal Batch Upload table for one-click undo.
+
+**Key Learning**: Upload routes swallow batch-create errors (`catch { batchId = undefined }`) — missing schema columns produce silent orphan transactions. Always verify batch appears in UI after upload.
+
+**Files**: `lib/db/schema.sql`, `scripts/undo-savings-upload-window.ts`
 
 ### [039] Potongan Gaji date range & Excel export (2026-06-29) ✅ COMPLETE
 

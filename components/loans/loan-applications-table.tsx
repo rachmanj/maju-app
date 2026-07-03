@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Button, Table, Modal, Form, InputNumber, App, Radio } from "antd";
+import { Button, Table, Modal, Form, InputNumber, Input, App, Radio, Space } from "antd";
 import { CheckOutlined } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 
@@ -171,19 +171,27 @@ export function LoanApplicationsTable() {
             {({ getFieldValue }) =>
               getFieldValue("interest_method") !== "manual" ? (
                 <Form.Item
-                  name="interest_rate"
                   label={getFieldValue("interest_method") === "flat" ? "Bunga (% per tahun)" : "Bunga (% total untuk seluruh tenor)"}
-                  rules={[
-                    { required: true, message: "Bunga wajib diisi" },
-                    {
-                      validator: (_, v) => {
-                        if (v != null && (v < 0 || v > 100)) return Promise.reject(new Error("Bunga 0–100%"));
-                        return Promise.resolve();
-                      },
-                    },
-                  ]}
+                  required
                 >
-                  <InputNumber className="w-full" min={0} max={100} step={0.1} addonAfter="%" />
+                  <Space.Compact block className="w-full">
+                    <Form.Item
+                      name="interest_rate"
+                      noStyle
+                      rules={[
+                        { required: true, message: "Bunga wajib diisi" },
+                        {
+                          validator: (_, v) => {
+                            if (v != null && (v < 0 || v > 100)) return Promise.reject(new Error("Bunga 0–100%"));
+                            return Promise.resolve();
+                          },
+                        },
+                      ]}
+                    >
+                      <InputNumber className="w-full" min={0} max={100} step={0.1} style={{ width: "100%" }} />
+                    </Form.Item>
+                    <Input style={{ width: 48 }} defaultValue="%" disabled />
+                  </Space.Compact>
                 </Form.Item>
               ) : (
                 <Form.Item
