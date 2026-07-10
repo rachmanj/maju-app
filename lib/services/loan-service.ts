@@ -4,6 +4,7 @@ import type { Loan, LoanApplication, LoanSchedule } from '@/types/database';
 import { LoanCalculator } from '../utils/loan-calculator';
 import { AuditService } from './audit-service';
 import { JournalService } from './journal-service';
+import { EARLY_SETTLEMENT_FEE_AMOUNT } from '@/lib/config/loan-config';
 
 type PrismaTx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
 
@@ -489,6 +490,171 @@ export class LoanService {
     return Number(payment.id);
   }
 
+  static async getEarlySettlementQuote(loanId: number): Promise<{
+    outstandingPrincipal: number;
+    waivedInterestAmount: number;
+    feeAmount: number;
+    totalDue: number;
+    pendingScheduleCount: number;
+  }> {
+    const loan = await prisma.loans.findUnique({
+      where: { id: loanId },
+      select: { principal_amount: true, status: true },
+    });
+    if (!loan) {
+      throw new Error('Pinjaman tidak ditemukan');
+    }
+    if (loan.status !== 'approved' && loan.status !== 'active') {
+      throw new Error('Pinjaman tidak aktif');
+    }
+
+    const [paymentAgg, pendingSchedules] = await Promise.all([
+      prisma.loan_payments.aggregate({
+        where: { loan_id: loanId },
+        _sum: { principal_amount: true },
+      }),
+      prisma.loan_schedules.findMany({
+        where: { loan_id: loanId, status: 'pending' },
+        select: { interest_amount: true },
+      }),
+    ]);
+
+    if (pendingSchedules.length === 0) {
+      throw new Error('Tidak ada angsuran yang tersisa untuk pelunasan dini');
+    }
+
+    const principalPaid = Number(paymentAgg._sum.principal_amount ?? 0);
+    const outstandingPrincipal = Math.max(0, Number(loan.principal_amount) - principalPaid);
+    if (outstandingPrincipal <= 0) {
+      throw new Error('Sisa pokok sudah lunas');
+    }
+
+    const waivedInterestAmount = pendingSchedules.reduce(
+      (sum, s) => sum + Number(s.interest_amount),
+      0
+    );
+    const feeAmount = EARLY_SETTLEMENT_FEE_AMOUNT;
+
+    return {
+      outstandingPrincipal,
+      waivedInterestAmount,
+      feeAmount,
+      totalDue: outstandingPrincipal + feeAmount,
+      pendingScheduleCount: pendingSchedules.length,
+    };
+  }
+
+  static async processEarlySettlement(data: {
+    loan_id: number;
+    payment_date: Date;
+    payment_method: 'cash' | 'salary_deduction' | 'savings' | 'transfer';
+    reference_number?: string;
+    notes?: string;
+    created_by?: number;
+    debitAccountId?: number;
+  }): Promise<number> {
+    const payment = await prisma.$transaction(async (tx) => {
+      const loan = await tx.loans.findUnique({
+        where: { id: data.loan_id },
+        select: { principal_amount: true, status: true },
+      });
+      if (!loan) {
+        throw new Error('Pinjaman tidak ditemukan');
+      }
+      if (loan.status !== 'approved' && loan.status !== 'active') {
+        throw new Error('Pinjaman tidak aktif');
+      }
+
+      const [paymentAgg, pendingSchedules] = await Promise.all([
+        tx.loan_payments.aggregate({
+          where: { loan_id: data.loan_id },
+          _sum: { principal_amount: true },
+        }),
+        tx.loan_schedules.findMany({
+          where: { loan_id: data.loan_id, status: 'pending' },
+          select: { interest_amount: true },
+        }),
+      ]);
+
+      if (pendingSchedules.length === 0) {
+        throw new Error('Tidak ada angsuran yang tersisa untuk pelunasan dini');
+      }
+
+      const principalPaid = Number(paymentAgg._sum.principal_amount ?? 0);
+      const outstandingPrincipal = Math.max(0, Number(loan.principal_amount) - principalPaid);
+      if (outstandingPrincipal <= 0) {
+        throw new Error('Sisa pokok sudah lunas');
+      }
+
+      const waivedInterestAmount = pendingSchedules.reduce(
+        (sum, s) => sum + Number(s.interest_amount),
+        0
+      );
+      const feeAmount = EARLY_SETTLEMENT_FEE_AMOUNT;
+      const totalDue = outstandingPrincipal + feeAmount;
+
+      const payCount = await tx.loan_payments.count();
+      const paymentNumber = `PAY${new Date().getFullYear()}${(payCount + 1).toString().padStart(6, '0')}`;
+
+      const pay = await tx.loan_payments.create({
+        data: {
+          loan_id: data.loan_id,
+          loan_schedule_id: null,
+          payment_number: paymentNumber,
+          payment_type: 'early_settlement',
+          payment_amount: totalDue,
+          principal_amount: outstandingPrincipal,
+          interest_amount: 0,
+          fee_amount: feeAmount,
+          waived_interest_amount: waivedInterestAmount,
+          payment_date: data.payment_date,
+          payment_method: data.payment_method,
+          reference_number: data.reference_number ?? null,
+          notes: data.notes ?? null,
+          created_by: data.created_by != null ? BigInt(data.created_by) : null,
+        },
+      });
+
+      await tx.loan_schedules.updateMany({
+        where: { loan_id: data.loan_id, status: 'pending' },
+        data: { status: 'waived', paid_at: new Date() },
+      });
+
+      await tx.loans.update({
+        where: { id: data.loan_id },
+        data: { status: 'completed', completed_date: new Date() },
+      });
+
+      return pay;
+    });
+
+    await AuditService.log({
+      user_id: data.created_by,
+      action: 'loan.early_settlement',
+      entity_type: 'loan',
+      entity_id: data.loan_id,
+      new_values: {
+        payment_amount: Number(payment.payment_amount),
+        principal_amount: Number(payment.principal_amount),
+        fee_amount: Number(payment.fee_amount ?? 0),
+        waived_interest_amount: Number(payment.waived_interest_amount ?? 0),
+        payment_date: data.payment_date,
+      },
+    });
+
+    const paymentNumber = payment.payment_number ?? undefined;
+    await JournalService.createLoanEarlySettlementJournal({
+      principalAmount: Number(payment.principal_amount),
+      feeAmount: Number(payment.fee_amount ?? 0),
+      referenceNumber: paymentNumber,
+      entryDate: data.payment_date.toISOString().split('T')[0],
+      createdBy: data.created_by,
+      debitAccountId: data.debitAccountId,
+    });
+
+    return Number(payment.id);
+  }
+
   static async importLoanFromExcelRow(params: {
     memberIdentifier: string;
     principalAmount: number;
@@ -676,7 +842,7 @@ export class LoanService {
       }),
       prisma.loan_schedules.findMany({
         where: { loan_id: { in: loanIds } },
-        select: { loan_id: true, installment_amount: true, paid_amount: true },
+        select: { loan_id: true, installment_amount: true, paid_amount: true, status: true },
       }),
     ]);
     const payMap = new Map(
@@ -691,7 +857,10 @@ export class LoanService {
     const scheduleRemainMap = new Map<number, number>();
     for (const s of scheduleRows) {
       const lid = Number(s.loan_id);
-      const rem = Math.max(0, Number(s.installment_amount) - Number(s.paid_amount ?? 0));
+      const rem =
+        s.status === 'waived' || s.status === 'paid'
+          ? 0
+          : Math.max(0, Number(s.installment_amount) - Number(s.paid_amount ?? 0));
       scheduleRemainMap.set(lid, (scheduleRemainMap.get(lid) ?? 0) + rem);
     }
     const detail = loans.map((loan) => {

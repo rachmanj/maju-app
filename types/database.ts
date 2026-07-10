@@ -249,9 +249,12 @@ export interface LoanPayment {
   loan_id: number;
   loan_schedule_id?: number;
   payment_number?: string;
+  payment_type?: 'installment' | 'early_settlement';
   payment_amount: number;
   principal_amount: number;
   interest_amount: number;
+  fee_amount?: number;
+  waived_interest_amount?: number;
   payment_date: Date;
   payment_method: 'cash' | 'salary_deduction' | 'savings' | 'transfer';
   reference_number?: string;

@@ -100,6 +100,7 @@ export const COA_ACCOUNTS: COAAccount[] = [
   { code: '4110', name: 'Pendapatan Bunga Pinjaman', account_type: 'revenue' },
   { code: '4111', name: 'Pendapatan Provisi Pinjaman', account_type: 'revenue' },
   { code: '4112', name: 'Pendapatan Administrasi Pinjaman', account_type: 'revenue' },
+  { code: '4113', name: 'Pendapatan Biaya Pelunasan Dini', account_type: 'revenue' },
   { code: '4210', name: 'Pendapatan Penjualan Barang Dagang', account_type: 'revenue' },
   { code: '4211', name: 'Pendapatan Penjualan Barang Konsinyasi', account_type: 'revenue', parent_code: '4210' },
   { code: '4212', name: 'Pendapatan Komisi Konsinyasi', account_type: 'revenue' },

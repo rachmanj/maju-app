@@ -251,6 +251,41 @@ export class JournalService {
     return journalId;
   }
 
+  static async createLoanEarlySettlementJournal(params: {
+    principalAmount: number;
+    feeAmount: number;
+    referenceNumber?: string;
+    entryDate?: string;
+    createdBy?: number;
+    debitAccountId?: number;
+  }): Promise<number> {
+    const defaultKasId = await this.getAccountIdByCode(COA_CODES.KAS);
+    const debitAccountId = params.debitAccountId ?? defaultKasId;
+    const piutangId = await this.getAccountIdByCode(COA_CODES.PIUTANG_PINJAMAN);
+    const feeRevenueId = await this.getAccountIdByCode(COA_CODES.PENDAPATAN_BIAYA_PELUNASAN);
+    if (!debitAccountId || !piutangId || !feeRevenueId) {
+      throw new Error('Chart of accounts not configured (Kas, Piutang Pinjaman 1211, Pendapatan Biaya Pelunasan 4113)');
+    }
+
+    const totalDebit = params.principalAmount + params.feeAmount;
+    const lines: { account_id: number; debit: number; credit: number; description?: string }[] = [
+      { account_id: debitAccountId, debit: totalDebit, credit: 0, description: params.referenceNumber },
+      { account_id: piutangId, debit: 0, credit: params.principalAmount, description: params.referenceNumber },
+    ];
+    if (params.feeAmount > 0) {
+      lines.push({ account_id: feeRevenueId, debit: 0, credit: params.feeAmount, description: params.referenceNumber });
+    }
+
+    const journalId = await this.createManualEntry({
+      entry_date: params.entryDate ?? new Date().toISOString().split('T')[0],
+      description: `Pelunasan dini pinjaman - ${params.referenceNumber || ''}`.trim(),
+      lines,
+      created_by: params.createdBy,
+    });
+    await this.postEntry(journalId);
+    return journalId;
+  }
+
   static async listJournalEntries(params: {
     page?: number;
     limit?: number;

@@ -1,5 +1,5 @@
 **Purpose**: AI's persistent knowledge base for project context and learnings
-**Last Updated**: 2026-07-03
+**Last Updated**: 2026-07-10
 
 ## Memory Maintenance Guidelines
 
@@ -26,6 +26,16 @@
 ---
 
 ## Project Memory Entries
+
+### [041] Pelunasan Pinjaman Sebelum Jatuh Tempo (2026-07-10) ✅ COMPLETE
+
+**Decision**: Early loan settlement pays only outstanding principal; all pending schedule interest is waived (not recognized as revenue). Flat fee Rp 50.000 charged via COA `4113` Pendapatan Biaya Pelunasan Dini. Pending schedules marked `waived`; loan closed as `completed`.
+
+**Solution**: Added `payment_type`, `fee_amount`, `waived_interest_amount` to `loan_payments`. New `LoanService.getEarlySettlementQuote` / `processEarlySettlement`, `JournalService.createLoanEarlySettlementJournal`, API `GET/POST /api/loans/[id]/pelunasan`, and "Pelunasan Dini" modal on loan detail page. Fixed balance export to treat `waived` schedules as zero remaining.
+
+**Key Learning**: Payoff amount = `principal_amount − Σ payments.principal_amount`, not `remaining_schedule_amount` (which includes future interest). Reuse existing `waived` schedule status instead of inventing new states.
+
+**Files**: `lib/services/loan-service.ts`, `lib/services/journal-service.ts`, `app/api/loans/[id]/pelunasan/route.ts`, `app/(dashboard)/dashboard/loans/[id]/page.tsx`, `lib/config/loan-config.ts`, `lib/config/coa-codes.ts`
 
 ### [040] Savings upload batch_type missing & orphan undo (2026-07-03) ✅ COMPLETE
 

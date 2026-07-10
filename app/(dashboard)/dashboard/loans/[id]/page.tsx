@@ -16,7 +16,7 @@ import {
   Select,
   App,
 } from "antd";
-import { ArrowLeftOutlined, DollarOutlined, DeleteOutlined } from "@ant-design/icons";
+import { ArrowLeftOutlined, DollarOutlined, DeleteOutlined, CheckCircleOutlined } from "@ant-design/icons";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
@@ -48,6 +48,21 @@ interface LoanDetail {
   schedules: ScheduleRow[];
 }
 
+interface EarlySettlementQuote {
+  outstandingPrincipal: number;
+  waivedInterestAmount: number;
+  feeAmount: number;
+  totalDue: number;
+  pendingScheduleCount: number;
+}
+
+const scheduleStatusMap: Record<string, string> = {
+  paid: "Lunas",
+  waived: "Dihapuskan",
+  pending: "Belum",
+  overdue: "Terlambat",
+};
+
 const statusMap: Record<string, { text: string; status: "success" | "warning" | "error" | "processing" | "default" }> = {
   active: { text: "Aktif", status: "success" },
   approved: { text: "Disetujui", status: "processing" },
@@ -68,8 +83,13 @@ export default function LoanDetailPage() {
   const [loading, setLoading] = useState(true);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [paymentSubmitting, setPaymentSubmitting] = useState(false);
+  const [pelunasanModalOpen, setPelunasanModalOpen] = useState(false);
+  const [pelunasanSubmitting, setPelunasanSubmitting] = useState(false);
+  const [pelunasanQuote, setPelunasanQuote] = useState<EarlySettlementQuote | null>(null);
+  const [pelunasanQuoteLoading, setPelunasanQuoteLoading] = useState(false);
   const [debitAccounts, setDebitAccounts] = useState<{ id: number; code: string; name: string }[]>([]);
   const [form] = Form.useForm();
+  const [pelunasanForm] = Form.useForm();
 
   const fetchLoan = async () => {
     if (!id) return;
@@ -96,19 +116,52 @@ export default function LoanDetailPage() {
   }, [id]);
 
   useEffect(() => {
-    if (paymentModalOpen) {
+    if (paymentModalOpen || pelunasanModalOpen) {
       fetch("/api/loans/payments/debit-accounts")
         .then((r) => r.json())
         .then((data) => {
           const accounts = Array.isArray(data) ? data : [];
           setDebitAccounts(accounts);
-          if (accounts.length > 0) {
-            form.setFieldsValue({ debit_account_id: accounts[0].id });
-          }
         })
         .catch(() => setDebitAccounts([]));
     }
-  }, [paymentModalOpen, form]);
+  }, [paymentModalOpen, pelunasanModalOpen]);
+
+  useEffect(() => {
+    if (!paymentModalOpen || debitAccounts.length === 0) return;
+    const current = form.getFieldValue("debit_account_id");
+    if (current == null) {
+      form.setFieldsValue({ debit_account_id: debitAccounts[0].id });
+    }
+  }, [paymentModalOpen, debitAccounts, form]);
+
+  useEffect(() => {
+    if (!pelunasanModalOpen || debitAccounts.length === 0) return;
+    const current = pelunasanForm.getFieldValue("debit_account_id");
+    if (current == null) {
+      pelunasanForm.setFieldsValue({ debit_account_id: debitAccounts[0].id });
+    }
+  }, [pelunasanModalOpen, debitAccounts, pelunasanForm]);
+
+  useEffect(() => {
+    if (!pelunasanModalOpen || !id) return;
+    setPelunasanQuoteLoading(true);
+    setPelunasanQuote(null);
+    fetch(`/api/loans/${id}/pelunasan`)
+      .then(async (r) => {
+        if (!r.ok) {
+          const err = await r.json();
+          throw new Error(err.error || "Gagal memuat simulasi pelunasan");
+        }
+        return r.json();
+      })
+      .then((data: EarlySettlementQuote) => setPelunasanQuote(data))
+      .catch((err) => {
+        message.error(err instanceof Error ? err.message : "Gagal memuat simulasi pelunasan");
+        setPelunasanModalOpen(false);
+      })
+      .finally(() => setPelunasanQuoteLoading(false));
+  }, [pelunasanModalOpen, id, message]);
 
   const formatRupiah = (n: number) =>
     new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
@@ -183,6 +236,7 @@ export default function LoanDetailPage() {
   };
 
   const openPaymentModal = (schedule?: ScheduleRow) => {
+    setPaymentModalOpen(true);
     if (schedule) {
       const remaining = Number(schedule.installment_amount) - Number(schedule.paid_amount ?? 0);
       form.setFieldsValue({
@@ -192,16 +246,86 @@ export default function LoanDetailPage() {
         interest_amount: Number(schedule.interest_amount),
         payment_date: new Date().toISOString().slice(0, 10),
         payment_method: "cash",
-        debit_account_id: undefined,
+        debit_account_id: debitAccounts[0]?.id,
       });
     } else {
       form.setFieldsValue({
+        loan_schedule_id: undefined,
+        payment_amount: undefined,
+        principal_amount: undefined,
+        interest_amount: undefined,
         payment_date: new Date().toISOString().slice(0, 10),
         payment_method: "cash",
-        debit_account_id: undefined,
+        debit_account_id: debitAccounts[0]?.id,
       });
     }
-    setPaymentModalOpen(true);
+  };
+
+  const openPelunasanModal = () => {
+    setPelunasanModalOpen(true);
+    pelunasanForm.setFieldsValue({
+      payment_date: new Date().toISOString().slice(0, 10),
+      payment_method: "cash",
+      debit_account_id: debitAccounts[0]?.id,
+    });
+  };
+
+  const handleSubmitPelunasan = (values: {
+    payment_date: string;
+    payment_method: string;
+    reference_number?: string;
+    notes?: string;
+    debit_account_id?: number;
+  }) => {
+    if (!pelunasanQuote) return;
+
+    Modal.confirm({
+      title: "Konfirmasi Pelunasan Dini",
+      content: (
+        <div className="space-y-2">
+          <p>
+            Pinjaman akan dilunasi dengan total pembayaran{" "}
+            <strong>{formatRupiah(pelunasanQuote.totalDue)}</strong>.
+          </p>
+          <p>Bunga sebesar {formatRupiah(pelunasanQuote.waivedInterestAmount)} akan dihapuskan.</p>
+          <p>Tindakan ini tidak dapat dibatalkan.</p>
+        </div>
+      ),
+      okText: "Lunasi Pinjaman",
+      cancelText: "Batal",
+      onOk: async () => {
+        setPelunasanSubmitting(true);
+        try {
+          const r = await fetch(`/api/loans/${id}/pelunasan`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              payment_date: values.payment_date,
+              payment_method: values.payment_method || "cash",
+              reference_number: values.reference_number || undefined,
+              notes: values.notes || undefined,
+              debit_account_id: values.debit_account_id || undefined,
+            }),
+          });
+
+          if (!r.ok) {
+            const err = await r.json();
+            throw new Error(err.error || "Gagal mencatat pelunasan dini");
+          }
+
+          message.success(`Pelunasan dini berhasil dicatat (${formatRupiah(pelunasanQuote.totalDue)})`);
+          setPelunasanModalOpen(false);
+          pelunasanForm.resetFields();
+          setPelunasanQuote(null);
+          fetchLoan();
+        } catch (err) {
+          message.error(err instanceof Error ? err.message : "Terjadi kesalahan");
+          throw err;
+        } finally {
+          setPelunasanSubmitting(false);
+        }
+      },
+    });
   };
 
   const scheduleColumns: ColumnsType<ScheduleRow> = [
@@ -240,13 +364,13 @@ export default function LoanDetailPage() {
       title: "Status",
       dataIndex: "status",
       key: "status",
-      render: (s: string) => (s === "paid" ? "Lunas" : "Belum"),
+      render: (s: string) => scheduleStatusMap[s] ?? s,
     },
     {
       title: "Aksi",
       key: "action",
       render: (_: unknown, record: ScheduleRow) =>
-        record.status !== "paid" ? (
+        record.status === "pending" || record.status === "overdue" ? (
           <Button type="link" size="small" onClick={() => openPaymentModal(record)}>
             Bayar
           </Button>
@@ -256,29 +380,47 @@ export default function LoanDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center">
-        <Spin size="large" />
-      </div>
+      <>
+        <div className="flex min-h-[40vh] items-center justify-center">
+          <Spin size="large" />
+        </div>
+        <Modal title="Catat Pembayaran" open={false} forceRender footer={null}>
+          <Form form={form} layout="vertical" />
+        </Modal>
+        <Modal title="Pelunasan Pinjaman Sebelum Jatuh Tempo" open={false} forceRender footer={null}>
+          <Form form={pelunasanForm} layout="vertical" />
+        </Modal>
+      </>
     );
   }
 
   if (!loan) {
     return (
-      <div className="space-y-6">
-        <Link href="/dashboard/loans">
-          <Button type="text" icon={<ArrowLeftOutlined />}>
-            Kembali
-          </Button>
-        </Link>
-        <Card>
-          <p className="text-muted-foreground">Pinjaman tidak ditemukan.</p>
-        </Card>
-      </div>
+      <>
+        <div className="space-y-6">
+          <Link href="/dashboard/loans">
+            <Button type="text" icon={<ArrowLeftOutlined />}>
+              Kembali
+            </Button>
+          </Link>
+          <Card>
+            <p className="text-muted-foreground">Pinjaman tidak ditemukan.</p>
+          </Card>
+        </div>
+        <Modal title="Catat Pembayaran" open={false} forceRender footer={null}>
+          <Form form={form} layout="vertical" />
+        </Modal>
+        <Modal title="Pelunasan Pinjaman Sebelum Jatuh Tempo" open={false} forceRender footer={null}>
+          <Form form={pelunasanForm} layout="vertical" />
+        </Modal>
+      </>
     );
   }
 
   const statusInfo = statusMap[loan.status] || { text: loan.status, status: "default" as const };
   const canPay = (loan.status === "active" || loan.status === "approved") && loan.schedules?.length > 0;
+  const hasPendingSchedules = (loan.schedules || []).some((s) => s.status === "pending" || s.status === "overdue");
+  const canPelunasan = canPay && hasPendingSchedules;
   const totalBunga = (loan.schedules || []).reduce((sum, s) => sum + Number(s.interest_amount ?? 0), 0);
   const totalPokok = loan.principal_amount;
 
@@ -300,6 +442,11 @@ export default function LoanDetailPage() {
           {canPay && (
             <Button type="primary" icon={<DollarOutlined />} onClick={() => openPaymentModal()}>
               Catat Pembayaran
+            </Button>
+          )}
+          {canPelunasan && (
+            <Button icon={<CheckCircleOutlined />} onClick={openPelunasanModal}>
+              Pelunasan Dini
             </Button>
           )}
           {canDelete && (
@@ -346,6 +493,7 @@ export default function LoanDetailPage() {
       <Modal
         title="Catat Pembayaran"
         open={paymentModalOpen}
+        forceRender
         onCancel={() => setPaymentModalOpen(false)}
         footer={null}
       >
@@ -427,6 +575,90 @@ export default function LoanDetailPage() {
           <Form.Item>
             <Button type="primary" htmlType="submit" loading={paymentSubmitting}>
               Simpan Pembayaran
+            </Button>
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title="Pelunasan Pinjaman Sebelum Jatuh Tempo"
+        open={pelunasanModalOpen}
+        forceRender
+        onCancel={() => {
+          setPelunasanModalOpen(false);
+          pelunasanForm.resetFields();
+          setPelunasanQuote(null);
+        }}
+        footer={null}
+      >
+        {pelunasanQuoteLoading ? (
+          <div className="flex justify-center py-8">
+            <Spin />
+          </div>
+        ) : pelunasanQuote ? (
+          <Descriptions column={1} bordered size="small" className="mb-4">
+            <Descriptions.Item label="Sisa Pokok">
+              {formatRupiah(pelunasanQuote.outstandingPrincipal)}
+            </Descriptions.Item>
+            <Descriptions.Item label="Bunga Dihapuskan">
+              {formatRupiah(pelunasanQuote.waivedInterestAmount)}
+            </Descriptions.Item>
+            <Descriptions.Item label="Biaya Pelunasan">
+              {formatRupiah(pelunasanQuote.feeAmount)}
+            </Descriptions.Item>
+            <Descriptions.Item label="Total yang Harus Dibayar">
+              <strong>{formatRupiah(pelunasanQuote.totalDue)}</strong>
+            </Descriptions.Item>
+            <Descriptions.Item label="Angsuran Tersisa">
+              {pelunasanQuote.pendingScheduleCount} angsuran
+            </Descriptions.Item>
+          </Descriptions>
+        ) : null}
+
+        <Form form={pelunasanForm} layout="vertical" onFinish={handleSubmitPelunasan}>
+          <Form.Item
+            name="payment_date"
+            label="Tanggal Pembayaran"
+            rules={[{ required: true, message: "Tanggal wajib diisi" }]}
+          >
+            <Input type="date" />
+          </Form.Item>
+          <Form.Item name="debit_account_id" label="Akun Debit (Kas/Bank)">
+            <Select
+              placeholder="Pilih akun Kas atau Bank (default: Kas)"
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              options={debitAccounts.map((a) => ({
+                value: a.id,
+                label: `${a.code} - ${a.name}`,
+              }))}
+            />
+          </Form.Item>
+          <Form.Item name="payment_method" label="Metode Pembayaran">
+            <Select
+              options={[
+                { value: "cash", label: "Tunai" },
+                { value: "transfer", label: "Transfer" },
+                { value: "savings", label: "Potong Simpanan" },
+                { value: "salary_deduction", label: "Potong Gaji" },
+              ]}
+            />
+          </Form.Item>
+          <Form.Item name="reference_number" label="No. Referensi">
+            <Input placeholder="Opsional" />
+          </Form.Item>
+          <Form.Item name="notes" label="Catatan">
+            <Input.TextArea rows={2} placeholder="Opsional" />
+          </Form.Item>
+          <Form.Item>
+            <Button
+              type="primary"
+              htmlType="submit"
+              loading={pelunasanSubmitting}
+              disabled={!pelunasanQuote || pelunasanQuoteLoading}
+            >
+              Proses Pelunasan Dini
             </Button>
           </Form.Item>
         </Form>

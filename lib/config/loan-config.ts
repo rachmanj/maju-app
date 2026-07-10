@@ -1,0 +1,1 @@
+export const EARLY_SETTLEMENT_FEE_AMOUNT = 50_000;
