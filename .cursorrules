@@ -1,112 +1,245 @@
 YOUR ROLES:
 
-1. CPA with experience 15+ years as ERP developer and tax and accounting consultant,
-2. senior programmer with experience 15+ years in developing ERP, expertise in ReactJs, NextJs, Ant Design (antd)
-3. senior UI/UX software designer with 15+ years experience in developing enterprise grade software,
-4. senior n8n architect with 10+ years experience in developing enterprise grade ERP
+1. CPA with 15+ years experience as ERP developer and tax & accounting consultant,
+2. senior programmer with 15+ years experience in enterprise ERP, expert in React, Next.js (App Router), TypeScript, Ant Design (antd),
+3. senior UI/UX software designer with 15+ years experience building enterprise-grade software,
+4. senior n8n architect with 10+ years experience in enterprise-grade ERP integration.
 
-# Enhanced Project Documentation Automation
+# Koperasi Maju ERP — Next.js full-stack cooperative management system
 
-## Core Documentation Maintenance
+Sistem ERP untuk koperasi simpan-pinjam + penjualan: keanggotaan, simpanan, pinjaman,
+inventory & konsinyasi, POS (kasir + self-service), akuntansi double-entry, dan laporan.
 
-After every significant code change, you MUST update the relevant documentation:
+## Tech Stack
 
-### Architecture Changes
+| Layer        | Technology |
+|--------------|------------|
+| Framework    | Next.js 16 (App Router, `output: "standalone"`), React 19 |
+| Language     | TypeScript (strict), path alias `@/*` → `./*` |
+| UI           | Ant Design 6 (primary) + shadcn/ui (`components/ui`) + Radix + Tailwind CSS 4 |
+| State        | Zustand (sidebar), React Context (POS self-service), `next-themes` (dark/light) |
+| Data access  | Prisma 7 ORM (`@prisma/client` + `@prisma/adapter-mariadb`) — provider `mysql` |
+| Raw SQL      | `mysql2/promise` — migration/seeding only |
+| Auth         | NextAuth v5 (beta), Credentials provider, JWT session, `bcryptjs` |
+| Validation   | Ant Design `Form` rules (zod & react-hook-form declared but unused) |
+| Excel/PDF    | `xlsx` (import/export), `jspdf` (declared) |
+| Charts       | `recharts` (declared, not yet wired) |
+| Testing      | Vitest (tests co-located in `__tests__/` folders) |
+| Dates/money  | `date-fns`, Decimal columns |
 
-When modifying system structure, components, or data flow:
+Declared-but-not-yet-used deps (do not assume wiring): `react-hook-form`, `zod`, `recharts`, `jspdf`, `react-hot-toast`.
 
-1. Update `docs/architecture.md` with current state
-2. Add/update Mermaid diagrams if data flow changed
-3. Log architectural decisions in `docs/decisions.md`
-4. Note any important discoveries in `MEMORY.md`
+## Module Architecture
 
-### Feature Development
+Three route groups under `app/`:
 
-When working on tasks:
+1. `app/(dashboard)/` — staff/admin back-office (Anggota, Pengguna, Simpanan, Pinjaman,
+   Akuntansi, Inventory, Konsinyasi, POS Kasir, Piutang, Pengeluaran, Pesanan, Laporan,
+   Audit Log, Monitoring, Pengaturan).
+2. `app/(member)/` — portal anggota (self-service: dashboard, pinjaman, pesanan, simpanan, transaksi).
+3. `app/(pos)/` — POS self-service kiosk (pembayaran potong gaji, pairing device).
 
-1. Update progress in `docs/todo.md`
-2. Move completed items to the "Recently Completed" section
-3. Update `docs/backlog.md` if scope or priorities change
-4. Document any technical decisions made
+Domain modules (each maps to `app/api/<prefix>` + `lib/services/<name>-service.ts` + page(s)):
 
-### Bug Fixes & Issues
+| Module | API prefix | Service | Key models |
+|--------|-----------|---------|------------|
+| Auth & RBAC | `/api/auth/*` | `lib/auth/*` | users, roles, permissions, role_permissions, user_roles |
+| Anggota | `/api/members/*` | member-service | members, member_documents, member_barcodes, member_pins, member_purchase_limits, member_status_history |
+| Simpanan | `/api/savings/*` | savings-service | savings_types, savings_accounts, savings_transactions, savings_upload_batches, savings_interest_rates |
+| Pinjaman | `/api/loans/*` | loan-service | loan_applications, loans, loan_schedules, loan_payments, member_credit_scores |
+| Akuntansi | `/api/accounting/*`, `/api/journal/*` | journal-service, report-service | chart_of_accounts, journal_entries, journal_entry_lines |
+| Inventory | `/api/inventory/*` | product-service, stock-service, warehouse-service, product-unit-service, product-category-service | products, product_categories, product_units, warehouses, warehouse_stock, stock_movements, product_prices |
+| Konsinyasi | `/api/inventory/consignment/*` | consignment-service | consignment_suppliers, consignment_receipts(+items), consignment_stock, consignment_sales, consignment_settlements |
+| POS | `/api/pos/*`, `/api/pos-public/*` | pos-service | pos_devices, pos_sessions, pos_transactions(+items), pos_payments, pos_self_service_devices |
+| Pesanan | `/api/orders/*` | order-service | member_orders(+items) |
+| Piutang | `/api/receivables/*` | receivables-service | member_receivables |
+| Pengeluaran | `/api/finance/*` | expense-service | expense_categories, cash_expenses, expense_attachments |
+| Pengaturan | `/api/settings/*`, `/api/departments/*`, `/api/projects/*`, `/api/users/*`, `/api/roles/*` | settings-service, department-service, project-service, user-service | departments, projects, cooperative_config, units, interest rates |
+| Notifikasi | `/api/notifications/*` | notification-service | notifications, notification_preferences |
+| Audit & Monitoring | `/api/audit-logs/*`, `/api/monitoring/*` | audit-service, monitoring-service | audit_logs, user_activity |
 
-When resolving problems:
+## Backend Architecture
 
-1. Log the issue and solution in `MEMORY.md`
-2. Update task status in `docs/todo.md`
-3. Update architecture docs if the fix reveals structural changes
+### Route → Service → Prisma pattern (ALWAYS)
 
-### Regular Maintenance
+- API route handlers (`app/api/**/route.ts`) are THIN: parse request → `auth()` → `hasPermission(...)` → delegate to a `lib/services/*-service.ts` static class → `NextResponse.json(...)`.
+- ALL business logic lives in service classes under `lib/services/`. Never inline Prisma queries in route handlers.
+- Services use `prisma.$transaction(async (tx) => ...)` for multi-step writes.
+- Auth gate pattern (see `app/api/members/route.ts`):
+  ```ts
+  const session = await auth();
+  if (!session || !hasPermission((session.user as any)?.roles || [], PERMISSIONS.MEMBER_VIEW)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  ```
+- Prisma error mapping: `Prisma.PrismaClientKnownRequestError` with `code === 'P2002'` → read `error.meta.target` to return an Indonesian 400 message (e.g. "Nomor anggota sudah digunakan").
 
-Periodically (when todo.md gets cluttered):
+### Auth & RBAC
 
-1. Archive old completed items from `docs/todo.md`
-2. Move future ideas from todo to `docs/backlog.md`
-3. Reprioritize based on what you've learned
+- NextAuth v5 Credentials + JWT (`lib/auth/config.ts`). Login accepts email, username, OR member_number; password verified with `bcrypt.compare`. Session token carries `roles[]` and `memberId`.
+- Roles: `superadmin`, `manager`, `pengurus`, `kasir`, `pengawas`, `anggota`.
+- Permissions are centralized in `lib/auth/permissions.ts` (`PERMISSIONS` map + `ROLE_PERMISSIONS` + `hasPermission(roles, perm)`). `superadmin` bypasses all checks. Add new permission codes HERE, never hardcode role names in routes.
+- Member PIN auth (self-service) is separate: `member_pins.pin_hash` via `MemberService.setPin/verifyPin` (bcrypt, 5-fail → 30-min lock).
 
-## Database Access Preferences
+### Accounting (double-entry)
 
-### MySQL MCP Integration
+- Every financial mutation posts a journal entry via `JournalService` (see `lib/services/journal-service.ts`).
+- COA account codes are centralized in `lib/config/coa-codes.ts` (`COA_CODES`) — never hardcode account numbers in services.
+- Loan interest method default `flat_total`; early settlement (pelunasan) charges flat fee Rp 50,000 (see `lib/config/loan-config.ts` → `EARLY_SETTLEMENT_FEE_AMOUNT`) and waives future schedule interest.
 
-- **ALWAYS use MySQL MCP** for database queries instead of Laravel Tinker commands
-- MCP provides direct, safe, read-only access to the `maju_app` database
-- Query the database directly using natural language requests
+### Audit trail
 
-### Database Query Guidelines
+- After every create/update/delete in a service, call `AuditService.log({ user_id, action, entity_type, entity_id, old_values, new_values })` from `lib/services/audit-service.ts`. `action` follows `module.verb` convention (e.g. `member.create`, `loan.approve`).
 
-- Use direct SQL queries via MCP for data exploration and analysis
-- Prefer MCP queries for database inspection
-- Examples:
-  - Instead of: "Run `User::count()` in tinker"
-  - Use: "How many users are in the database?"
-  - Instead of: "Check recent distributions with tinker"
-  - Use: "Show me distributions created in the last 7 days"
+### Migrations (⚠️ non-standard — read carefully)
 
-### When to Use Each Tool
+- **Source of truth is `lib/db/schema.sql`**, executed by `runMigrations()` in `lib/db/migrate.ts` via `npm run migrate` (`tsx scripts/run-migration.ts`). It creates the DB + runs `CREATE TABLE IF NOT EXISTS` + seeds defaults (roles, savings types, units, COA, admin user).
+- `prisma/schema.prisma` is a MIRROR of schema.sql (table names bridged with `@@map`). There is no `prisma migrate` history — keep `schema.sql` and `schema.prisma` in sync MANUALLY when adding/changing tables.
+- After editing `schema.prisma`, run `prisma generate` (auto-runs on `postinstall` and `npm run build`).
+- App is in active development: prefer EDITING existing schema.sql tables over adding migration files for the same table.
+- Seed: `tsx prisma/seed.ts` + `seedInitialData()`. One-off fix scripts live in `scripts/`.
 
-- **MySQL MCP**: Data inspection, analysis, counts, structure exploration
-- **Laravel Artisan**: Migrations, seeding, cache clearing, queue management
-- **Manual file editing**: Code changes, configuration updates
+## Database Conventions
 
-## Documentation Standards
+- MySQL/MariaDB, database `maju_app`, charset `utf8mb4`.
+- Connection config: `lib/db/get-database-config.ts` (accepts `DATABASE_URL` (mysql://) OR `DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME`). Prisma client in `lib/db/prisma.ts` (singleton, dev-log `error`/`warn`).
+- Primary keys: `BigInt` `@id @default(autoincrement())`. FK id columns are `BigInt`/`Int`.
+- Money = `Decimal(15,2)`; quantities/stock = `Decimal(15,3)`; rates = `Decimal(5,2)`.
+- **BigInt/decimal serialization**: convert `BigInt` → `Number(...)` and `Decimal` → `Number(...)` at the service/route boundary BEFORE returning JSON. Use `lib/utils/to-json-safe.ts` (handles BigInt, Decimal `.toNumber()`, Date→ISO, nested) — it exists because raw `BigInt` throws "Do not know how to serialize a BigInt".
+- Soft delete: nullable `deleted_at` timestamp; always filter `deleted_at: null` in queries.
+- Audit columns on mutable tables: `created_by`, `updated_by`, `created_at`, `updated_at`.
+- Table/column naming: snake_case in DB (`@@map`), camelCase in Prisma client.
+- Generated IDs: member barcode = `MBR` + id padded to 8 (`MBR00000001`); savings account number via `lib/utils/savings-account-number.ts`.
+- Multi-tenancy via `project_id` on members (Proyek), and `warehouse_id` scoping on inventory/POS.
 
-### Architecture Documentation
+## Frontend Architecture
 
-- Document CURRENT state, not intended state
-- Include working code examples and patterns
-- Generate Mermaid diagrams for complex data flows
-- Reference specific files and functions when relevant
+- Pages are overwhelmingly **client components** (`"use client"`, ~56/69 pages). Data is fetched via `fetch()` to the app's own API routes inside `useEffect` — NOT server props, NOT direct Prisma on the client.
+- Layout shell (`app/(dashboard)/layout.tsx`): `SessionProvider` → `DashboardRedirect` guard → `Sidebar` (AntD `Menu`, collapsible via zustand `use-sidebar`) + `Header`. `useHeartbeat("dashboard")` tracks online status.
+- Member portal guard: `components/auth/member-portal-guard.tsx`. POS self-service guard: `components/auth/pos-self-service-guard.tsx`.
+- Navigation menu is built in `components/layout/sidebar.tsx` and filtered by `hasPermission(roles, ...)`. Add new pages there.
+- Toast/message: AntD `App.useApp()` → `message.success/error`. NOT react-hot-toast.
+- Theme: `next-themes` + `components/providers/theme-provider.tsx` (dark/light), CSS variables `hsl(var(--...))`.
 
-### Task Management
+### Shared component patterns
 
-- Include sufficient context for future AI assistance
-- Reference specific files, functions, and error messages
-- Update status and completion dates accurately
-- Note blockers and dependencies clearly
-- Keep focus on immediate work, move future ideas to backlog
+| Pattern | Where | Notes |
+|---------|-------|-------|
+| Data table | `components/<module>/<x>-table.tsx` (e.g. members-table) | AntD `Table` + local search `Input` + `useState` pagination; fetches `/api/...`; listens for `<module>-refresh` window event |
+| Excel upload | `components/<module>/<x>-upload-excel.tsx` | `xlsx` parse → POST to `/api/.../upload`; batch tracking for undo |
+| Form | `app/.../<module>/new/page.tsx`, `[id]/edit/page.tsx` | AntD `Form` + `Form.useForm`, `rules` validation, `layout="vertical"` |
+| Detail/edit | `app/.../<module>/[id]/page.tsx` + `/edit` | fetch by id, render `Card`s |
 
-### Memory Entries
+## Code Patterns
 
-- Focus on significant decisions and learnings
-- Include actionable insights, not just descriptions
-- Keep entries concise but informative
-- Archive old entries when file gets too long
+### Service skeleton
+```ts
+import { prisma } from '@/lib/db/prisma';
+import { AuditService } from './audit-service';
 
-### Decision Records
+export class XService {
+  static async create(data: {...}, createdBy?: number): Promise<number> {
+    const row = await prisma.$transaction(async (tx) => {
+      const r = await tx.x.create({ data: { ...data, created_by: createdBy != null ? BigInt(createdBy) : null } });
+      return r;
+    });
+    await AuditService.log({ user_id: createdBy, action: 'x.create', entity_type: 'x', entity_id: Number(row.id), new_values: data });
+    return Number(row.id);
+  }
+}
+```
 
-- Capture context that led to the decision
-- Document alternatives that were considered
-- Include implementation implications
-- Set review dates for revisiting decisions
+### API route skeleton
+```ts
+import { auth } from '@/lib/auth/config';
+import { hasPermission, PERMISSIONS } from '@/lib/auth/permissions';
+import { XService } from '@/lib/services/x-service';
 
-## Cross-Referencing Rules
+export async function GET(request: NextRequest) {
+  const session = await auth();
+  if (!session || !hasPermission((session.user as any)?.roles || [], PERMISSIONS.X_VIEW)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  try {
+    const sp = request.nextUrl.searchParams;
+    const result = await XService.list({ page: parseInt(sp.get('page') || '1'), limit: parseInt(sp.get('limit') || '20'), search: sp.get('search') || undefined });
+    return NextResponse.json(result);
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message || 'Failed' }, { status: 500 });
+  }
+}
+```
 
-- Always check existing documentation before adding new content
-- Link related decisions, tasks, and architecture changes
-- Update multiple files when changes affect multiple areas
-- Maintain consistency between memory, architecture, and task tracking
+## Development Commands
 
-this app is still in development, so you can edit migration files instead create new one for same table
+```bash
+npm install                 # triggers prisma generate (postinstall)
+npm run dev                 # next dev  → http://localhost:3000
+npm run build               # prisma generate && next build --webpack
+npm run start               # next start (production, standalone output)
+npm run lint                # eslint
+npm run migrate             # tsx scripts/run-migration.ts (schema.sql + seed)
+npm run create-admin        # tsx scripts/create-admin.ts
+npm run validate-migration  # tsx scripts/validate-migration.ts
+npm test                    # vitest run
+npx prisma generate         # regenerate Prisma client after schema change
+npx shadcn@latest add <x>   # add shadcn component to components/ui
+```
 
-Remember: These documents should provide comprehensive context for future development and AI assistance, evolving as living documentation that stays current with your codebase.
+Default admin (after `npm run migrate`): `admin@koperasimaju.com` / `admin123` (override via `ADMIN_EMAIL`/`ADMIN_PASSWORD`).
+
+## Testing
+
+- Vitest; tests are co-located in `__tests__/` folders (e.g. `lib/db/__tests__/get-database-config.test.ts`, `lib/utils/__tests__/savings-account-number.test.ts`).
+- Pure functions (calculators, account-number generation, config parsing) are unit-tested; no DB integration tests yet.
+
+## Key Rules
+
+1. Always route DB access through a service class — never Prisma/mysql2 in route handlers or React components.
+2. Gate every API route with `auth()` + `hasPermission(...)`; member/self-service routes use the member guard (`require-anggota`).
+3. Convert all `BigInt`/`Decimal` to `Number` at the API boundary (use `toJsonSafe`) — raw BigInt breaks JSON serialization.
+4. Post accounting journals for every financial transaction; use `COA_CODES` from `lib/config/coa-codes.ts` (no hardcoded account numbers).
+5. Log every mutation via `AuditService.log`.
+6. Respect soft delete (`deleted_at`) in every query.
+7. Keep `lib/db/schema.sql` and `prisma/schema.prisma` in sync; regenerate client after schema edits.
+8. Reuse one `where`-builder for list + export so filtered Excel matches on-screen data.
+9. UI copy is Bahasa Indonesia; money/date formats use `id-ID` locale.
+10. After any significant change, update `MEMORY.md` (living project knowledge base) following its entry format — see the file's header for the required structure and archive rules.
+
+## Adding a New Module
+
+1. **Schema** — add table(s) to `lib/db/schema.sql` AND mirror in `prisma/schema.prisma` (with `@@map`), then `npx prisma generate`.
+2. **Service** — create `lib/services/<module>-service.ts` (static class, Prisma + `$transaction` + `AuditService.log`).
+3. **Permission** — add codes to `lib/auth/permissions.ts` and assign to roles in `ROLE_PERMISSIONS`.
+4. **API routes** — `app/api/<module>/route.ts` (+ `[id]/route.ts`), thin auth-gated handlers.
+5. **UI** — `app/(dashboard)/dashboard/<module>/page.tsx` + `components/<module>/<module>-table.tsx`; register in `components/layout/sidebar.tsx` behind the permission flag.
+6. **Seed** — add default rows to `seedInitialData()` / `prisma/seed.ts` if the module needs defaults.
+
+## File Structure Reference
+
+```
+app/
+  api/                      # Route handlers (thin, auth-gated)
+  (dashboard)/dashboard/    # staff/admin pages
+  (member)/member/          # member self-service portal
+  (pos)/pos/                # POS self-service kiosk
+  login/                    # NextAuth sign-in page
+components/
+  ui/                       # shadcn primitives
+  layout/                   # sidebar, header, theme-toggle
+  auth/                     # guards, redirect, change-password
+  providers/                # session/theme/antd providers
+  <module>/                 # domain tables, uploads, modals
+lib/
+  auth/                     # config.ts (NextAuth), permissions.ts, require-anggota.ts
+  db/                       # prisma.ts, schema.sql, migrate.ts, get-database-config.ts
+  config/                   # coa-codes.ts, loan-config.ts
+  services/                 # domain services (one class per module)
+  utils/                    # loan-calculator, savings-account-number, to-json-safe
+  hooks/                    # use-sidebar, use-heartbeat
+prisma/                     # schema.prisma, seed.ts
+scripts/                    # one-off migrate/seed/undo utilities (tsx)
+types/                      # database.ts, next-auth.d.ts
+```
+
+This app is still in development — prefer editing existing tables/files over creating new migration files for the same table.
