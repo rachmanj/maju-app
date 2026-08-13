@@ -15,7 +15,15 @@ export async function GET(request: NextRequest) {
     const product_id = searchParams.get('product_id');
 
     if (warehouse_id) {
-      const stock = await StockService.getStockByWarehouse(parseInt(warehouse_id));
+      const search = searchParams.get('search') || undefined;
+      const category_id = searchParams.get('category_id');
+      const low_stock = searchParams.get('low_stock') === 'true';
+
+      const stock = await StockService.getStockByWarehouse(parseInt(warehouse_id), {
+        ...(search && { search }),
+        ...(category_id && { category_id: parseInt(category_id) }),
+        ...(low_stock && { low_stock: true }),
+      });
       return NextResponse.json(stock);
     }
     if (product_id) {

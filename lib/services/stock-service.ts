@@ -2,20 +2,40 @@ import { prisma } from '@/lib/db/prisma';
 import { AuditService } from './audit-service';
 
 export class StockService {
-  static async getStockByWarehouse(warehouseId: number): Promise<
+  static async getStockByWarehouse(
+    warehouseId: number,
+    filters?: { search?: string; category_id?: number; low_stock?: boolean }
+  ): Promise<
     { product_id: number; product_code: string; product_name: string; unit_code: string; quantity: number; min_stock: number }[]
   > {
+    const productWhere: {
+      deleted_at: null;
+      category_id?: number;
+      OR?: Array<{ name: { contains: string } } | { code: { contains: string } }>;
+    } = { deleted_at: null };
+
+    if (filters?.category_id != null) {
+      productWhere.category_id = filters.category_id;
+    }
+    if (filters?.search) {
+      productWhere.OR = [
+        { name: { contains: filters.search } },
+        { code: { contains: filters.search } },
+      ];
+    }
+
     const rows = await prisma.warehouse_stock.findMany({
       where: {
         warehouse_id: warehouseId,
-        product: { deleted_at: null },
+        product: productWhere,
       },
       include: {
         product: { include: { base_unit: { select: { code: true } } } },
       },
       orderBy: { product: { code: 'asc' } },
     });
-    return rows.map((r) => ({
+
+    let result = rows.map((r) => ({
       product_id: Number(r.product_id),
       product_code: r.product.code,
       product_name: r.product.name,
@@ -23,6 +43,12 @@ export class StockService {
       quantity: Number(r.quantity),
       min_stock: Number(r.product.min_stock ?? 0),
     }));
+
+    if (filters?.low_stock) {
+      result = result.filter((r) => r.min_stock > 0 && r.quantity < r.min_stock);
+    }
+
+    return result;
   }
 
   static async getStockByProduct(productId: number): Promise<

@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Card, Select, Table, Button, App, Modal, Form, InputNumber, DatePicker, Input } from "antd";
+import { useCallback, useEffect, useState } from "react";
+import { Card, Select, Table, Button, App, Modal, Form, InputNumber, DatePicker, Input, Switch } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 import { format } from "date-fns";
@@ -24,7 +24,11 @@ interface Warehouse {
 export default function InventoryStockPage() {
   const { message } = App.useApp();
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [categories, setCategories] = useState<{ id: number; code: string; name: string }[]>([]);
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<number | null>(null);
+  const [search, setSearch] = useState("");
+  const [categoryId, setCategoryId] = useState<number | null>(null);
+  const [lowStock, setLowStock] = useState(false);
   const [stock, setStock] = useState<StockRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [movementModalOpen, setMovementModalOpen] = useState(false);
@@ -37,19 +41,38 @@ export default function InventoryStockPage() {
     fetch("/api/inventory/warehouses?all=true")
       .then((r) => (r.ok ? r.json() : []))
       .then(setWarehouses);
+    fetch("/api/inventory/categories")
+      .then((r) => (r.ok ? r.json() : []))
+      .then(setCategories);
   }, []);
 
-  useEffect(() => {
+  const buildStockParams = useCallback(() => {
+    const params = new URLSearchParams({
+      warehouse_id: String(selectedWarehouseId),
+    });
+    if (search.trim()) params.set("search", search.trim());
+    if (categoryId != null) params.set("category_id", String(categoryId));
+    if (lowStock) params.set("low_stock", "true");
+    return params;
+  }, [selectedWarehouseId, search, categoryId, lowStock]);
+
+  const fetchStock = useCallback(async () => {
     if (!selectedWarehouseId) {
       setStock([]);
       return;
     }
     setLoading(true);
-    fetch(`/api/inventory/stock?warehouse_id=${selectedWarehouseId}`)
-      .then((r) => (r.ok ? r.json() : []))
-      .then(setStock)
-      .finally(() => setLoading(false));
-  }, [selectedWarehouseId]);
+    try {
+      const r = await fetch(`/api/inventory/stock?${buildStockParams()}`);
+      setStock(r.ok ? await r.json() : []);
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedWarehouseId, buildStockParams]);
+
+  useEffect(() => {
+    fetchStock();
+  }, [fetchStock]);
 
   useEffect(() => {
     if (!movementModalOpen) return;
@@ -110,8 +133,7 @@ export default function InventoryStockPage() {
       setMovementModalOpen(false);
       movementForm.resetFields();
       if (selectedWarehouseId) {
-        const r = await fetch(`/api/inventory/stock?warehouse_id=${selectedWarehouseId}`);
-        if (r.ok) setStock(await r.json());
+        await fetchStock();
       }
     } catch (error: any) {
       message.error(error.message || "Terjadi kesalahan");
@@ -163,7 +185,7 @@ export default function InventoryStockPage() {
       </div>
 
       <Card title="Stok per Gudang">
-        <div className="mb-4 flex items-center gap-4">
+        <div className="mb-4 flex flex-wrap items-center gap-4">
           <span className="text-sm text-muted-foreground">Gudang:</span>
           <Select
             placeholder="Pilih gudang"
@@ -173,6 +195,25 @@ export default function InventoryStockPage() {
             onChange={setSelectedWarehouseId}
             options={warehouses.map((w) => ({ value: w.id, label: `${w.code} - ${w.name}` }))}
           />
+          <Input
+            placeholder="Cari produk (nama/kode)..."
+            allowClear
+            className="min-w-[240px]"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <Select
+            placeholder="Kategori"
+            allowClear
+            className="min-w-[200px]"
+            value={categoryId}
+            onChange={setCategoryId}
+            options={categories.map((c) => ({ value: c.id, label: `${c.code} - ${c.name}` }))}
+          />
+          <span className="flex items-center gap-2 text-sm text-muted-foreground">
+            Stok menipis
+            <Switch checked={lowStock} onChange={setLowStock} />
+          </span>
         </div>
 
         <Table
