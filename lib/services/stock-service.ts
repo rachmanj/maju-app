@@ -24,24 +24,26 @@ export class StockService {
       ];
     }
 
-    const rows = await prisma.warehouse_stock.findMany({
-      where: {
-        warehouse_id: warehouseId,
-        product: productWhere,
-      },
+    const products = await prisma.products.findMany({
+      where: productWhere,
       include: {
-        product: { include: { base_unit: { select: { code: true } } } },
+        warehouse_stock: {
+          where: { warehouse_id: warehouseId },
+          select: { quantity: true },
+          take: 1,
+        },
+        base_unit: { select: { code: true } },
       },
-      orderBy: { product: { code: 'asc' } },
+      orderBy: { code: 'asc' },
     });
 
-    let result = rows.map((r) => ({
-      product_id: Number(r.product_id),
-      product_code: r.product.code,
-      product_name: r.product.name,
-      unit_code: r.product.base_unit.code,
-      quantity: Number(r.quantity),
-      min_stock: Number(r.product.min_stock ?? 0),
+    let result = products.map((p) => ({
+      product_id: Number(p.id),
+      product_code: p.code,
+      product_name: p.name,
+      unit_code: p.base_unit.code,
+      quantity: p.warehouse_stock[0] ? Number(p.warehouse_stock[0].quantity) : 0,
+      min_stock: Number(p.min_stock ?? 0),
     }));
 
     if (filters?.low_stock) {
