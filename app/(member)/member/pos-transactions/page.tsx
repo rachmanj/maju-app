@@ -22,7 +22,7 @@ const ID_MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agt", 
 
 function formatTransactionDate(value: string): string {
   const d = new Date(value);
-  const day = d.getDate();
+  const day = String(d.getDate()).padStart(2, '0');
   const month = ID_MONTH_SHORT[d.getMonth()];
   const year = d.getFullYear();
   const hours = String(d.getHours()).padStart(2, "0");
