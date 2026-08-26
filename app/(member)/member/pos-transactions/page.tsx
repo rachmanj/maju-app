@@ -18,6 +18,18 @@ type TxRow = {
   payment_methods: string;
 };
 
+const ID_MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agt", "Sep", "Okt", "Nov", "Des"];
+
+function formatTransactionDate(value: string): string {
+  const d = new Date(value);
+  const day = d.getDate();
+  const month = ID_MONTH_SHORT[d.getMonth()];
+  const year = d.getFullYear();
+  const hours = String(d.getHours()).padStart(2, "0");
+  const minutes = String(d.getMinutes()).padStart(2, "0");
+  return `${day} ${month} ${year}, ${hours}:${minutes}`;
+}
+
 export default function MemberPosTransactionsPage() {
   const [range, setRange] = useState<[Dayjs | null, Dayjs | null]>([
     dayjs().startOf("month"),
@@ -71,7 +83,7 @@ export default function MemberPosTransactionsPage() {
       title: "Tanggal",
       dataIndex: "transaction_date",
       key: "transaction_date",
-      render: (v: string) => (v ? new Date(v).toLocaleString("id-ID") : "-"),
+      render: (v: string) => (v ? formatTransactionDate(v) : "-"),
     },
     { title: "Gudang", dataIndex: "warehouse_name", key: "warehouse_name" },
     {
