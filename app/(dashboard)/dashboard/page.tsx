@@ -1,10 +1,24 @@
 import { Card, Row, Col } from "antd";
 import { UserOutlined, WalletOutlined, CreditCardOutlined, RiseOutlined } from "@ant-design/icons";
 import { prisma } from "@/lib/db/prisma";
+import { MonthlySalesChart } from "@/components/dashboard/monthly-sales-chart";
 
 export const dynamic = 'force-dynamic';
 
 const ACTIVE_LOAN_STATUSES = ['approved', 'disbursed', 'active'] as const;
+
+const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'] as const;
+
+function buildEmptyMonthlySales(): { label: string; total: number }[] {
+  const result: { label: string; total: number }[] = [];
+  const now = new Date();
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const label = `${MONTH_LABELS[d.getMonth()]} ${d.getFullYear()}`;
+    result.push({ label, total: 0 });
+  }
+  return result;
+}
 
 async function getDashboardStats() {
   try {
@@ -34,6 +48,36 @@ async function getDashboardStats() {
   }
 }
 
+async function getMonthlySales(): Promise<{ label: string; total: number }[]> {
+  try {
+    const rows = await prisma.$queryRaw<{ bulan: string; total: unknown }[]>`
+      SELECT DATE_FORMAT(transaction_date, '%Y-%m') AS bulan, SUM(total_amount) AS total
+      FROM pos_transactions
+      WHERE status = 'completed'
+        AND transaction_date >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
+      GROUP BY bulan
+    `;
+
+    const totalByMonth = new Map<string, number>();
+    for (const row of rows) {
+      totalByMonth.set(row.bulan, Number(row.total ?? 0));
+    }
+
+    const result: { label: string; total: number }[] = [];
+    const now = new Date();
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      const label = `${MONTH_LABELS[d.getMonth()]} ${d.getFullYear()}`;
+      result.push({ label, total: totalByMonth.get(key) ?? 0 });
+    }
+    return result;
+  } catch (error) {
+    console.error("Error fetching monthly POS sales:", error);
+    return buildEmptyMonthlySales();
+  }
+}
+
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("id-ID", {
     style: "currency",
@@ -43,7 +87,7 @@ function formatCurrency(amount: number) {
 }
 
 export default async function DashboardPage() {
-  const stats = await getDashboardStats();
+  const [stats, monthlySales] = await Promise.all([getDashboardStats(), getMonthlySales()]);
 
   const statCards = [
     {
@@ -109,6 +153,15 @@ export default async function DashboardPage() {
             </Card>
           </Col>
         ))}
+        <Col span={24}>
+          <Card
+            title="Penjualan POS 12 Bulan"
+            className="border-[hsl(var(--border))] shadow-sm"
+            styles={{ body: { padding: "16px 24px 24px" } }}
+          >
+            <MonthlySalesChart data={monthlySales} />
+          </Card>
+        </Col>
       </Row>
     </div>
   );
