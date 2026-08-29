@@ -2,6 +2,8 @@ import { Card, Row, Col } from "antd";
 import { UserOutlined, WalletOutlined, CreditCardOutlined, RiseOutlined } from "@ant-design/icons";
 import { prisma } from "@/lib/db/prisma";
 
+export const dynamic = 'force-dynamic';
+
 const ACTIVE_LOAN_STATUSES = ['approved', 'disbursed', 'active'] as const;
 
 async function getDashboardStats() {
