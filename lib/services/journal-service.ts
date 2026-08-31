@@ -60,17 +60,15 @@ export class JournalService {
               reference_id: data.reference_id != null ? BigInt(data.reference_id) : null,
             },
           });
-          for (const line of data.lines) {
-            await tx.journal_entry_lines.create({
-              data: {
-                journal_entry_id: je.id,
-                account_id: line.account_id,
-                debit: line.debit || 0,
-                credit: line.credit || 0,
-                description: line.description ?? null,
-              },
-            });
-          }
+          await tx.journal_entry_lines.createMany({
+            data: data.lines.map((line) => ({
+              journal_entry_id: je.id,
+              account_id: line.account_id,
+              debit: line.debit || 0,
+              credit: line.credit || 0,
+              description: line.description ?? null,
+            })),
+          });
           return je;
         });
         return Number(entry.id);

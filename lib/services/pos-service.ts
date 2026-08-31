@@ -417,12 +417,31 @@ export class POSService {
       if (balance < total) throw new Error(`Saldo simpanan sukarela tidak mencukupi. Saldo: Rp ${balance.toLocaleString('id-ID')}`);
     }
 
+    const stockProductIds = [...new Set(params.items.map((i) => i.product_id))];
+    const stockRows = await prisma.warehouse_stock.findMany({
+      where: {
+        warehouse_id: params.warehouseId,
+        product_id: { in: stockProductIds },
+      },
+    });
+    const stockByProductId = new Map(stockRows.map((r) => [Number(r.product_id), Number(r.quantity)]));
+    let insufficientItem: { product_id: number; available: number } | null = null;
     for (const item of params.items) {
-      const qty = await StockService.getQuantity(params.warehouseId, item.product_id);
+      const qty = stockByProductId.get(item.product_id) ?? 0;
       if (qty < item.quantity) {
-        const prod = await ProductService.getById(item.product_id);
-        throw new Error(`Stok tidak mencukupi untuk ${prod?.name ?? 'produk'}. Tersedia: ${qty}`);
+        insufficientItem = { product_id: item.product_id, available: qty };
+        break;
       }
+    }
+    if (insufficientItem) {
+      const products = await prisma.products.findMany({
+        where: { id: insufficientItem.product_id, deleted_at: null },
+        select: { id: true, name: true },
+      });
+      const prod = products.find((p) => Number(p.id) === insufficientItem!.product_id);
+      throw new Error(
+        `Stok tidak mencukupi untuk ${prod?.name ?? 'produk'}. Tersedia: ${insufficientItem.available}`
+      );
     }
 
     const session = await prisma.pos_sessions.findFirst({
@@ -449,19 +468,16 @@ export class POSService {
         },
       });
 
-      for (const item of params.items) {
-        const itemTotal = item.quantity * item.unit_price;
-        await tx.pos_transaction_items.create({
-          data: {
-            pos_transaction_id: t.id,
-            product_id: item.product_id,
-            quantity: item.quantity,
-            unit_id: item.unit_id,
-            unit_price: item.unit_price,
-            total_amount: itemTotal,
-          },
-        });
-      }
+      await tx.pos_transaction_items.createMany({
+        data: params.items.map((item) => ({
+          pos_transaction_id: t.id,
+          product_id: item.product_id,
+          quantity: item.quantity,
+          unit_id: item.unit_id,
+          unit_price: item.unit_price,
+          total_amount: item.quantity * item.unit_price,
+        })),
+      });
 
       await tx.pos_payments.create({
         data: {
@@ -498,22 +514,22 @@ export class POSService {
           },
           update: { quantity: { decrement: item.quantity } },
         });
-        const movementNumber = `POS-OUT-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-        await tx.stock_movements.create({
-          data: {
-            movement_number: movementNumber,
-            movement_type: 'out',
-            warehouse_id: params.warehouseId,
-            product_id: item.product_id,
-            quantity: -item.quantity,
-            unit_id: item.unit_id,
-            reference_type: 'pos_transaction',
-            reference_id: t.id,
-            movement_date: transactionDate,
-            created_by: params.createdBy != null ? BigInt(params.createdBy) : null,
-          },
-        });
       }
+      const movementTimestamp = Date.now();
+      await tx.stock_movements.createMany({
+        data: params.items.map((item, index) => ({
+          movement_number: `POS-OUT-${movementTimestamp}-${Math.random().toString(36).slice(2, 8)}-${index}`,
+          movement_type: 'out',
+          warehouse_id: params.warehouseId,
+          product_id: item.product_id,
+          quantity: -item.quantity,
+          unit_id: item.unit_id,
+          reference_type: 'pos_transaction',
+          reference_id: t.id,
+          movement_date: transactionDate,
+          created_by: params.createdBy != null ? BigInt(params.createdBy) : null,
+        })),
+      });
 
       if (params.paymentMethod === PAYMENT_SIMPANAN) {
         const sukarelaType = await tx.savings_types.findUnique({ where: { code: 'SUKARELA' } });
@@ -549,10 +565,24 @@ export class POSService {
     });
 
     try {
-      const kasId = await JournalService.getAccountIdByCode(COA_CODES.KAS);
-      const piutangId = await JournalService.getAccountIdByCode(COA_CODES.PIUTANG_PEMBELIAN);
-      const simpananId = await JournalService.getAccountIdByCode(COA_CODES.SIMPANAN_SUKARELA);
-      const pendapatanId = await JournalService.getAccountIdByCode(COA_CODES.PENDAPATAN_PENJUALAN);
+      const coaRows = await prisma.chart_of_accounts.findMany({
+        where: {
+          code: {
+            in: [
+              COA_CODES.KAS,
+              COA_CODES.PIUTANG_PEMBELIAN,
+              COA_CODES.SIMPANAN_SUKARELA,
+              COA_CODES.PENDAPATAN_PENJUALAN,
+            ],
+          },
+        },
+        select: { id: true, code: true },
+      });
+      const coaByCode = new Map(coaRows.map((r) => [r.code, r.id]));
+      const kasId = coaByCode.get(COA_CODES.KAS) ?? null;
+      const piutangId = coaByCode.get(COA_CODES.PIUTANG_PEMBELIAN) ?? null;
+      const simpananId = coaByCode.get(COA_CODES.SIMPANAN_SUKARELA) ?? null;
+      const pendapatanId = coaByCode.get(COA_CODES.PENDAPATAN_PENJUALAN) ?? null;
       if (kasId && pendapatanId) {
         const lines: { account_id: number; debit: number; credit: number; description?: string }[] = [];
         if (params.paymentMethod === PAYMENT_CASH) {
