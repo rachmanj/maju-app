@@ -1,6 +1,13 @@
 export function getDatabaseConfig():
   | string
-  | { host: string; port: number; user: string; password: string; database: string } {
+  | {
+      host: string;
+      port: number;
+      user: string;
+      password: string;
+      database: string;
+      allowPublicKeyRetrieval?: boolean;
+    } {
   const url = process.env.DATABASE_URL;
   if (url && typeof url === 'string' && url.startsWith('mysql://')) {
     try {
@@ -12,6 +19,7 @@ export function getDatabaseConfig():
         user: decodeURIComponent(parsed.username || 'root'),
         password,
         database: (parsed.pathname || '/maju_app').replace(/^\//, '') || 'maju_app',
+        allowPublicKeyRetrieval: true,
       };
     } catch {
       return url;
@@ -23,5 +31,6 @@ export function getDatabaseConfig():
     user: process.env.DB_USER ?? 'root',
     password: process.env.DB_PASSWORD ?? '',
     database: process.env.DB_NAME ?? 'maju_app',
+    allowPublicKeyRetrieval: true,
   };
 }

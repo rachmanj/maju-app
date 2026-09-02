@@ -21,6 +21,7 @@ describe('getDatabaseConfig', () => {
       user: 'root',
       password: 'password',
       database: 'maju_app',
+      allowPublicKeyRetrieval: true,
     });
   });
 
@@ -34,6 +35,7 @@ describe('getDatabaseConfig', () => {
       user: 'root',
       password: 'secret',
       database: 'maju_app',
+      allowPublicKeyRetrieval: true,
     });
   });
 
@@ -51,6 +53,7 @@ describe('getDatabaseConfig', () => {
       user: 'admin',
       password: 'adminpass',
       database: 'testdb',
+      allowPublicKeyRetrieval: true,
     });
   });
 
@@ -67,6 +70,7 @@ describe('getDatabaseConfig', () => {
       user: 'root',
       password: '',
       database: 'maju_app',
+      allowPublicKeyRetrieval: true,
     });
   });
 });
