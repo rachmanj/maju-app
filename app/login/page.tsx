@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { signIn } from "next-auth/react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button, Card, Input, Form, App } from "antd";
 import { UserOutlined, LockOutlined } from "@ant-design/icons";
@@ -73,6 +74,12 @@ export default function LoginPage() {
             </Button>
           </Form.Item>
         </Form>
+        <div className="mt-6 border-t border-border pt-4 text-center text-sm text-muted-foreground">
+          Atau buka{" "}
+          <Link href="/pos" className="text-teal-600 hover:underline">
+            POS Self-Service
+          </Link>
+        </div>
       </Card>
     </div>
   );
