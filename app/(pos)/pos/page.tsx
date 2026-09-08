@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { useSession, signIn } from "next-auth/react";
 import {
   Card,
@@ -297,6 +298,12 @@ export default function POSSelfServicePage() {
               </Button>
             </Form.Item>
           </Form>
+          <div className="mt-6 border-t border-border pt-4 text-center text-sm text-muted-foreground">
+            Login sebagai staf?{" "}
+            <Link href="/login" className="text-teal-600 hover:underline">
+              Buka halaman Login
+            </Link>
+          </div>
         </Card>
       </div>
     );
@@ -346,6 +353,12 @@ export default function POSSelfServicePage() {
               </Button>
             </Form.Item>
           </Form>
+          <div className="mt-6 border-t border-border pt-4 text-center text-sm text-muted-foreground">
+            Atau buka{" "}
+            <Link href="/login" className="text-teal-600 hover:underline">
+              halaman Login
+            </Link>
+          </div>
         </Card>
       </div>
     );
