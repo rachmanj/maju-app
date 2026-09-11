@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth/config';
 import { WarehouseService } from '@/lib/services/warehouse-service';
 import { hasPermission, PERMISSIONS } from '@/lib/auth/permissions';
+import { mapPrismaError } from '@/lib/utils/prisma-error';
 
 export async function GET(
   request: NextRequest,
@@ -42,11 +43,9 @@ export async function PATCH(
     const body = await request.json();
     await WarehouseService.update(parseInt(id), body, parseInt(session.user.id));
     return NextResponse.json({ message: 'Warehouse updated successfully' });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error updating warehouse:', error);
-    return NextResponse.json(
-      { error: error.message || 'Failed to update warehouse' },
-      { status: 500 }
-    );
+    const { status, message } = mapPrismaError(error, 'Gagal mengubah gudang');
+    return NextResponse.json({ error: message }, { status });
   }
 }

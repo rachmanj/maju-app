@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth/config';
 import { ProductService } from '@/lib/services/product-service';
 import { hasPermission, PERMISSIONS } from '@/lib/auth/permissions';
 import { prisma } from '@/lib/db/prisma';
+import { mapPrismaError } from '@/lib/utils/prisma-error';
 
 export async function GET() {
   try {
@@ -39,11 +40,9 @@ export async function POST(request: NextRequest) {
       },
     });
     return NextResponse.json({ id: created.id, message: 'Category created successfully' }, { status: 201 });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error creating category:', error);
-    return NextResponse.json(
-      { error: error.message || 'Failed to create category' },
-      { status: 500 }
-    );
+    const { status, message } = mapPrismaError(error, 'Gagal membuat kategori');
+    return NextResponse.json({ error: message }, { status });
   }
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth/config';
 import { ProductService } from '@/lib/services/product-service';
 import { hasPermission, PERMISSIONS } from '@/lib/auth/permissions';
+import { mapPrismaError } from '@/lib/utils/prisma-error';
 
 export async function GET(
   request: NextRequest,
@@ -50,11 +51,9 @@ export async function PATCH(
     const body = await request.json();
     await ProductService.update(parseInt(id), body, parseInt(session.user.id));
     return NextResponse.json({ message: 'Product updated successfully' });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error updating product:', error);
-    return NextResponse.json(
-      { error: error.message || 'Failed to update product' },
-      { status: 500 }
-    );
+    const { status, message } = mapPrismaError(error, 'Gagal mengubah produk');
+    return NextResponse.json({ error: message }, { status });
   }
 }

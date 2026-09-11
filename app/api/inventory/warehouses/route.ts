@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth/config';
 import { WarehouseService } from '@/lib/services/warehouse-service';
 import { hasPermission, PERMISSIONS } from '@/lib/auth/permissions';
 import type { Warehouse } from '@/types/database';
+import { mapPrismaError } from '@/lib/utils/prisma-error';
 
 export async function GET(request: NextRequest) {
   try {
@@ -65,11 +66,9 @@ export async function POST(request: NextRequest) {
       created_by: parseInt(session.user.id),
     });
     return NextResponse.json({ id, message: 'Warehouse created successfully' }, { status: 201 });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error creating warehouse:', error);
-    return NextResponse.json(
-      { error: error.message || 'Failed to create warehouse' },
-      { status: 500 }
-    );
+    const { status, message } = mapPrismaError(error, 'Gagal membuat gudang');
+    return NextResponse.json({ error: message }, { status });
   }
 }

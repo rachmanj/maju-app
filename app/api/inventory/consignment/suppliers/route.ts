@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth/config';
 import { ConsignmentService } from '@/lib/services/consignment-service';
 import { hasPermission, PERMISSIONS } from '@/lib/auth/permissions';
 import { toJsonSafe } from '@/lib/utils/to-json-safe';
+import { mapPrismaError } from '@/lib/utils/prisma-error';
 
 export async function GET(request: NextRequest) {
   try {
@@ -36,8 +37,9 @@ export async function POST(request: NextRequest) {
       created_by: parseInt(session.user.id),
     });
     return NextResponse.json({ id, message: 'Supplier created' }, { status: 201 });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Consignment suppliers POST:', error);
-    return NextResponse.json({ error: error.message || 'Failed to create supplier' }, { status: 500 });
+    const { status, message } = mapPrismaError(error, 'Gagal membuat supplier');
+    return NextResponse.json({ error: message }, { status });
   }
 }

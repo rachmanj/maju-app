@@ -4,6 +4,7 @@ import { ProductService } from '@/lib/services/product-service';
 import { ProductUnitService } from '@/lib/services/product-unit-service';
 import { hasPermission, PERMISSIONS } from '@/lib/auth/permissions';
 import { prisma } from '@/lib/db/prisma';
+import { mapPrismaError } from '@/lib/utils/prisma-error';
 import * as XLSX from 'xlsx';
 
 const COLUMN_ALIASES: Record<string, string[]> = {
@@ -174,7 +175,8 @@ export async function POST(request: NextRequest) {
         successCount++;
         results.push({ row: rowNum, status: 'success' });
       } catch (e) {
-        results.push({ row: rowNum, status: 'error', message: (e as Error).message });
+        const { message } = mapPrismaError(e, 'Gagal membuat produk');
+        results.push({ row: rowNum, status: 'error', message: `Baris ${rowNum}: ${message}` });
       }
     }
 
@@ -192,9 +194,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error: unknown) {
     console.error('Product upload error:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to process upload' },
-      { status: 500 }
-    );
+    const { status, message } = mapPrismaError(error, 'Gagal memproses upload');
+    return NextResponse.json({ error: message }, { status });
   }
 }
