@@ -6,6 +6,7 @@ import { Card, Descriptions, Button, Spin, App, Table, Badge, Row, Col, Statisti
 import { ArrowLeftOutlined, EditOutlined, WalletOutlined, CreditCardOutlined, EyeOutlined, ShoppingOutlined } from "@ant-design/icons";
 import Link from "next/link";
 import { MemberApprovalButton } from "@/components/members/member-approval-button";
+import { MemberPinCard } from "@/components/members/member-pin-card";
 import type { ColumnsType } from "antd/es/table";
 
 interface Member {
@@ -389,6 +390,8 @@ export default function MemberDetailPage() {
           </Descriptions.Item>
         </Descriptions>
       </Card>
+
+      <MemberPinCard memberId={member.id} />
 
       <Row gutter={[24, 24]}>
         <Col xs={24} lg={12}>
