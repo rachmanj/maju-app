@@ -381,7 +381,7 @@ export class POSService {
     skipPinVerification?: boolean;
     discountAmount?: number;
     createdBy?: number;
-  }): Promise<{ transaction_number: string; transaction_id: number }> {
+  }): Promise<{ transaction_number: string; transaction_id: number; must_change_pin: boolean }> {
     if (params.items.length === 0) throw new Error('Cart is empty');
 
     const member = await MemberService.getMemberById(params.memberId);
@@ -390,6 +390,8 @@ export class POSService {
     const subtotal = params.items.reduce((sum, i) => sum + i.quantity * i.unit_price, 0);
     const discount = params.discountAmount ?? 0;
     const total = Math.max(0, subtotal - discount);
+
+    let markTempPinUsed = false;
 
     if (params.paymentMethod === PAYMENT_POTONG_GAJI) {
       const limit = await MemberService.getPurchaseLimit(params.memberId);
@@ -405,6 +407,18 @@ export class POSService {
         if (!params.pin) throw new Error('PIN diperlukan untuk pembayaran Potong Gaji');
         const pinValid = await MemberService.verifyPin(params.memberId, params.pin);
         if (!pinValid) throw new Error('PIN salah');
+        const pinRow = await prisma.member_pins.findUnique({
+          where: { member_id: params.memberId },
+          select: { must_change_pin: true, temp_pin_used_at: true },
+        });
+        if (pinRow?.must_change_pin && pinRow.temp_pin_used_at) {
+          throw new Error(
+            'PIN sementara sudah dipakai. Ganti PIN terlebih dahulu di Portal Anggota atau minta petugas reset ulang.'
+          );
+        }
+        if (pinRow?.must_change_pin && !pinRow.temp_pin_used_at) {
+          markTempPinUsed = true;
+        }
       }
     }
 
@@ -561,6 +575,13 @@ export class POSService {
         }
       }
 
+      if (markTempPinUsed) {
+        await tx.member_pins.update({
+          where: { member_id: params.memberId },
+          data: { temp_pin_used_at: transactionDate },
+        });
+      }
+
       return t;
     });
 
@@ -607,7 +628,11 @@ export class POSService {
       console.error('POS auto-journal failed:', journalErr);
     }
 
-    return { transaction_number: transNum, transaction_id: Number(transaction.id) };
+    return {
+      transaction_number: transNum,
+      transaction_id: Number(transaction.id),
+      must_change_pin: markTempPinUsed,
+    };
   }
 
   static formatPaymentMethodsLabel(methods: string[]): string {

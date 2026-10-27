@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { Button, Avatar, Dropdown } from "antd";
@@ -25,6 +25,18 @@ export function MemberPortalNav() {
   const { data: session } = useSession();
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const [setPinOpen, setSetPinOpen] = useState(false);
+  const [mustChangePin, setMustChangePin] = useState(false);
+
+  const refreshPinStatus = useCallback(() => {
+    fetch("/api/member-portal/pin")
+      .then((r) => r.json())
+      .then((d) => setMustChangePin(d.must_change_pin === true))
+      .catch(() => setMustChangePin(false));
+  }, []);
+
+  useEffect(() => {
+    refreshPinStatus();
+  }, [refreshPinStatus]);
 
   const menuItems: MenuProps["items"] = [
     {
@@ -97,8 +109,26 @@ export function MemberPortalNav() {
           open={changePasswordOpen}
           onClose={() => setChangePasswordOpen(false)}
         />
-        <SetPinModal open={setPinOpen} onClose={() => setSetPinOpen(false)} />
+        <SetPinModal
+          open={setPinOpen}
+          onClose={() => {
+            setSetPinOpen(false);
+            refreshPinStatus();
+          }}
+        />
       </div>
+      {mustChangePin && (
+        <div className="border-t border-amber-200 bg-amber-50 px-4 py-2 dark:border-amber-900/50 dark:bg-amber-950/40">
+          <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-2">
+            <p className="text-sm text-amber-900 dark:text-amber-100">
+              PIN Anda masih PIN sementara. Ganti sekarang.
+            </p>
+            <Button type="primary" size="small" onClick={() => setSetPinOpen(true)}>
+              Ganti PIN
+            </Button>
+          </div>
+        </div>
+      )}
     </header>
   );
 }

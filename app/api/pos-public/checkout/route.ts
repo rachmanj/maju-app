@@ -51,7 +51,11 @@ export async function POST(request: NextRequest) {
       createdBy: userId,
     });
 
-    return NextResponse.json(result);
+    return NextResponse.json({
+      transaction_number: result.transaction_number,
+      transaction_id: result.transaction_id,
+      must_change_pin: result.must_change_pin,
+    });
   } catch (error: unknown) {
     console.error('POS public checkout:', error);
     return NextResponse.json(

@@ -65,6 +65,10 @@ export default function POSSelfServicePage() {
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "potong_gaji" | "simpanan">("potong_gaji");
   const [pin, setPin] = useState("");
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [changePinModalOpen, setChangePinModalOpen] = useState(false);
+  const [checkoutPinForChange, setCheckoutPinForChange] = useState("");
+  const [changePinLoading, setChangePinLoading] = useState(false);
+  const [changePinForm] = Form.useForm();
   const [loginForm] = Form.useForm();
   const [pairingForm] = Form.useForm();
   const [loginLoading, setLoginLoading] = useState(false);
@@ -180,6 +184,30 @@ export default function POSSelfServicePage() {
 
   const subtotal = cart.reduce((s, c) => s + c.total, 0);
 
+  const handleSaveNewPinAfterCheckout = async (values: { newPin: string; confirmPin: string }) => {
+    setChangePinLoading(true);
+    try {
+      const response = await fetch("/api/member-portal/pin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          currentPin: checkoutPinForChange,
+          newPin: values.newPin,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Gagal menyimpan PIN");
+      message.success("PIN berhasil diganti");
+      setChangePinModalOpen(false);
+      setCheckoutPinForChange("");
+      changePinForm.resetFields();
+    } catch (e: unknown) {
+      message.error(e instanceof Error ? e.message : "Gagal menyimpan PIN");
+    } finally {
+      setChangePinLoading(false);
+    }
+  };
+
   const handleCheckout = async () => {
     if (!sessionId || !memberId || cart.length === 0 || !warehouseId) {
       message.warning("Keranjang tidak boleh kosong");
@@ -211,9 +239,15 @@ export default function POSSelfServicePage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Checkout gagal");
       message.success(`Transaksi ${data.transaction_number} berhasil`);
+      const pinUsedForCheckout = pin;
       setCart([]);
       setCheckoutModal(false);
       setPin("");
+      if (data.must_change_pin) {
+        setCheckoutPinForChange(pinUsedForCheckout);
+        changePinForm.resetFields();
+        setChangePinModalOpen(true);
+      }
     } catch (e: unknown) {
       message.error(e instanceof Error ? e.message : "Checkout gagal");
     } finally {
@@ -468,6 +502,60 @@ export default function POSSelfServicePage() {
             </div>
           )}
         </div>
+      </Modal>
+
+      <Modal
+        title="PIN sementara sudah dipakai"
+        open={changePinModalOpen}
+        onCancel={() => {
+          setChangePinModalOpen(false);
+          setCheckoutPinForChange("");
+          changePinForm.resetFields();
+        }}
+        footer={null}
+        destroyOnHidden
+      >
+        <p className="mb-4 text-sm text-muted-foreground">
+          Transaksi berhasil. PIN sementara hanya boleh dipakai sekali untuk belanja. Silakan buat PIN baru
+          sekarang agar pembayaran Potong Gaji berikutnya dapat dilakukan.
+        </p>
+        <Form form={changePinForm} layout="vertical" onFinish={handleSaveNewPinAfterCheckout}>
+          <Form.Item
+            label="PIN Baru"
+            name="newPin"
+            rules={[
+              { required: true, message: "PIN wajib diisi" },
+              { min: 4, message: "PIN minimal 4 digit" },
+              { max: 8, message: "PIN maksimal 8 digit" },
+              { pattern: /^\d+$/, message: "PIN hanya boleh berisi angka" },
+            ]}
+          >
+            <Input.Password placeholder="4–8 digit angka" maxLength={8} autoComplete="new-password" />
+          </Form.Item>
+          <Form.Item
+            label="Konfirmasi PIN"
+            name="confirmPin"
+            dependencies={["newPin"]}
+            rules={[
+              { required: true, message: "Konfirmasi PIN wajib diisi" },
+              ({ getFieldValue }) => ({
+                validator(_, value) {
+                  if (!value || getFieldValue("newPin") === value) {
+                    return Promise.resolve();
+                  }
+                  return Promise.reject(new Error("PIN tidak cocok"));
+                },
+              }),
+            ]}
+          >
+            <Input.Password placeholder="Ulangi PIN" maxLength={8} autoComplete="new-password" />
+          </Form.Item>
+          <Form.Item className="mb-0">
+            <Button type="primary" htmlType="submit" block loading={changePinLoading}>
+              Simpan
+            </Button>
+          </Form.Item>
+        </Form>
       </Modal>
     </div>
   );

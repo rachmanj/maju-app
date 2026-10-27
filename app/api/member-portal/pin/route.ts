@@ -12,11 +12,25 @@ export async function GET() {
     }
 
     const pinRecord = await prisma.member_pins.findUnique({
-      where: { member_id: memberId, is_active: true },
-      select: { id: true },
+      where: { member_id: memberId },
+      select: {
+        id: true,
+        is_active: true,
+        must_change_pin: true,
+        temp_pin_expires_at: true,
+      },
     });
 
-    return NextResponse.json({ hasPin: !!pinRecord });
+    const activePin = pinRecord?.is_active ? pinRecord : null;
+    const temp_pin_expired =
+      activePin?.temp_pin_expires_at != null &&
+      new Date(activePin.temp_pin_expires_at) < new Date();
+
+    return NextResponse.json({
+      hasPin: !!activePin,
+      must_change_pin: activePin?.must_change_pin ?? false,
+      temp_pin_expired,
+    });
   } catch (error: unknown) {
     console.error('PIN status error:', error);
     return NextResponse.json(
@@ -80,6 +94,15 @@ export async function POST(request: NextRequest) {
     }
 
     await MemberService.setPin(memberId, pinStr);
+
+    await prisma.member_pins.update({
+      where: { member_id: memberId },
+      data: {
+        must_change_pin: false,
+        temp_pin_used_at: null,
+        temp_pin_expires_at: null,
+      },
+    });
 
     return NextResponse.json({ message: 'PIN berhasil disimpan' });
   } catch (error: unknown) {
