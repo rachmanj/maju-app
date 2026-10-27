@@ -105,6 +105,17 @@ CREATE TABLE IF NOT EXISTS projects (
     updated_by BIGINT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Departments
+CREATE TABLE IF NOT EXISTS departments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    code VARCHAR(50) NOT NULL UNIQUE,
+    name VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP NULL,
+    INDEX idx_code (code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Members table
 CREATE TABLE IF NOT EXISTS members (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -116,6 +127,7 @@ CREATE TABLE IF NOT EXISTS members (
     address TEXT,
     job_title VARCHAR(255),
     project_id INT NULL,
+    department_id INT NULL,
     status ENUM('pending', 'active', 'inactive', 'resigned') DEFAULT 'pending',
     joined_date DATE,
     resigned_date DATE NULL,
@@ -130,6 +142,9 @@ CREATE TABLE IF NOT EXISTS members (
     INDEX idx_status (status),
     INDEX idx_deleted_at (deleted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+ALTER TABLE members ADD COLUMN department_id INT NULL;
+ALTER TABLE members ADD CONSTRAINT fk_members_department FOREIGN KEY (department_id) REFERENCES departments(id);
 
 ALTER TABLE members MODIFY COLUMN nik VARCHAR(255) NULL UNIQUE;
 ALTER TABLE members ADD COLUMN member_number VARCHAR(50) NULL UNIQUE;
