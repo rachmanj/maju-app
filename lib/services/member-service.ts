@@ -1,3 +1,4 @@
+import { randomInt } from 'crypto';
 import { prisma } from '@/lib/db/prisma';
 import type { Member } from '@/types/database';
 import bcrypt from 'bcryptjs';
@@ -348,10 +349,19 @@ export class MemberService {
   static async verifyPin(memberId: number, pin: string): Promise<boolean> {
     const pinData = await prisma.member_pins.findUnique({
       where: { member_id: memberId },
-      select: { pin_hash: true, is_active: true, locked_until: true, failed_attempts: true },
+      select: {
+        pin_hash: true,
+        is_active: true,
+        locked_until: true,
+        failed_attempts: true,
+        temp_pin_expires_at: true,
+      },
     });
     if (!pinData?.is_active) return false;
     if (pinData.locked_until && new Date(pinData.locked_until) > new Date()) return false;
+    if (pinData.temp_pin_expires_at && new Date(pinData.temp_pin_expires_at) < new Date()) {
+      return false;
+    }
 
     const isValid = await bcrypt.compare(pin, pinData.pin_hash);
     if (!isValid) {
@@ -368,6 +378,83 @@ export class MemberService {
       });
     }
     return isValid;
+  }
+
+  static async resetPin(
+    memberId: number,
+    resetBy: number
+  ): Promise<{ tempPin: string; expiresAt: Date }> {
+    const tempPin = String(randomInt(0, 1_000_000)).padStart(6, '0');
+    await MemberService.setPin(memberId, tempPin);
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    await prisma.member_pins.update({
+      where: { member_id: memberId },
+      data: {
+        must_change_pin: true,
+        temp_pin_used_at: null,
+        temp_pin_expires_at: expiresAt,
+        last_reset_at: now,
+        last_reset_by: BigInt(resetBy),
+      },
+    });
+    return { tempPin, expiresAt };
+  }
+
+  static async unlockPin(memberId: number): Promise<void> {
+    const row = await prisma.member_pins.findUnique({
+      where: { member_id: memberId },
+      select: { id: true },
+    });
+    if (!row) {
+      throw new Error('PIN anggota tidak ditemukan');
+    }
+    await prisma.member_pins.update({
+      where: { member_id: memberId },
+      data: { failed_attempts: 0, locked_until: null },
+    });
+  }
+
+  static async getPinStatus(memberId: number): Promise<{
+    has_pin: boolean;
+    is_active: boolean;
+    must_change_pin: boolean;
+    locked_until: Date | null;
+    failed_attempts: number;
+    last_reset_at: Date | null;
+    last_reset_by: number | null;
+  }> {
+    const row = await prisma.member_pins.findUnique({
+      where: { member_id: memberId },
+      select: {
+        is_active: true,
+        must_change_pin: true,
+        locked_until: true,
+        failed_attempts: true,
+        last_reset_at: true,
+        last_reset_by: true,
+      },
+    });
+    if (!row) {
+      return {
+        has_pin: false,
+        is_active: false,
+        must_change_pin: false,
+        locked_until: null,
+        failed_attempts: 0,
+        last_reset_at: null,
+        last_reset_by: null,
+      };
+    }
+    return {
+      has_pin: true,
+      is_active: row.is_active ?? false,
+      must_change_pin: row.must_change_pin ?? false,
+      locked_until: row.locked_until,
+      failed_attempts: row.failed_attempts ?? 0,
+      last_reset_at: row.last_reset_at,
+      last_reset_by: row.last_reset_by != null ? Number(row.last_reset_by) : null,
+    };
   }
 
   static async getMemberBarcode(memberId: number): Promise<string | null> {

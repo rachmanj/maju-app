@@ -203,10 +203,21 @@ CREATE TABLE IF NOT EXISTS member_pins (
     is_active BOOLEAN DEFAULT TRUE,
     failed_attempts INT DEFAULT 0,
     locked_until TIMESTAMP NULL,
+    must_change_pin BOOLEAN NOT NULL DEFAULT FALSE,
+    temp_pin_used_at TIMESTAMP NULL,
+    temp_pin_expires_at TIMESTAMP NULL,
+    last_reset_at TIMESTAMP NULL,
+    last_reset_by BIGINT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+ALTER TABLE member_pins ADD COLUMN must_change_pin BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE member_pins ADD COLUMN temp_pin_used_at TIMESTAMP NULL;
+ALTER TABLE member_pins ADD COLUMN temp_pin_expires_at TIMESTAMP NULL;
+ALTER TABLE member_pins ADD COLUMN last_reset_at TIMESTAMP NULL;
+ALTER TABLE member_pins ADD COLUMN last_reset_by BIGINT NULL;
 
 -- ============================================
 -- SAVINGS MODULE

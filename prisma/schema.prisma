@@ -234,6 +234,11 @@ model member_pins {
   is_active      Boolean?  @default(true)
   failed_attempts Int?     @default(0)
   locked_until   DateTime? @db.Timestamp(0)
+  must_change_pin Boolean  @default(false)
+  temp_pin_used_at DateTime? @db.Timestamp(0)
+  temp_pin_expires_at DateTime? @db.Timestamp(0)
+  last_reset_at  DateTime? @db.Timestamp(0)
+  last_reset_by  BigInt?
   created_at     DateTime? @default(now()) @db.Timestamp(0)
   updated_at     DateTime? @default(now()) @updatedAt @db.Timestamp(0)
   member         members   @relation(fields: [member_id], references: [id], onDelete: Cascade)
