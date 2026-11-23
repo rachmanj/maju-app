@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Menu, Button } from "antd";
 import type { MenuProps } from "antd";
@@ -115,7 +115,34 @@ export function Sidebar() {
   const router = useRouter();
   const { isCollapsed, toggle } = useSidebar();
   const menuItems = useMenuItems();
-  
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [canScrollDown, setCanScrollDown] = useState(false);
+
+  const updateScrollIndicator = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) {
+      setCanScrollDown(false);
+      return;
+    }
+    setCanScrollDown(el.scrollTop + el.clientHeight < el.scrollHeight - 4);
+  }, []);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const scheduleUpdate = () => {
+      requestAnimationFrame(() => updateScrollIndicator());
+    };
+    scheduleUpdate();
+    el.addEventListener("scroll", updateScrollIndicator);
+    const ro = new ResizeObserver(scheduleUpdate);
+    ro.observe(el);
+    return () => {
+      el.removeEventListener("scroll", updateScrollIndicator);
+      ro.disconnect();
+    };
+  }, [updateScrollIndicator, menuItems]);
+
   useEffect(() => {
     // Auto-collapse on mobile
     const handleResize = () => {
@@ -202,18 +229,26 @@ export function Sidebar() {
           aria-label={isCollapsed ? "Expand menu" : "Collapse menu"}
         />
       </div>
-      <div className="flex-1 overflow-y-auto py-3">
-        <Menu
-          mode="inline"
-          selectedKeys={[selectedKey]}
-          openKeys={openKeys}
-          onOpenChange={setOpenKeys}
-          items={menuItems}
-          onClick={handleMenuClick}
-          inlineCollapsed={isCollapsed}
-          className="border-0! bg-transparent! [&_.ant-menu-item]:mx-2! [&_.ant-menu-item]:rounded-lg! [&_.ant-menu-item-selected]:bg-teal-500/20! [&_.ant-menu-item-selected]:text-teal-400! [&_.ant-menu-item]:text-[hsl(var(--sidebar-foreground))]/80! [&_.ant-menu-item:hover]:text-white! [&_.ant-menu-item]:h-11! [&_.ant-menu-submenu-title]:mx-2! [&_.ant-menu-submenu-title]:rounded-lg! [&_.ant-menu-submenu-selected>.ant-menu-submenu-title]:text-teal-400!"
-          style={{ background: "transparent" }}
-        />
+      <div className="relative min-h-0 flex-1">
+        <div ref={scrollRef} className="h-full overflow-y-auto py-3">
+          <Menu
+            mode="inline"
+            selectedKeys={[selectedKey]}
+            openKeys={openKeys}
+            onOpenChange={setOpenKeys}
+            items={menuItems}
+            onClick={handleMenuClick}
+            inlineCollapsed={isCollapsed}
+            className="border-0! bg-transparent! [&_.ant-menu-item]:mx-2! [&_.ant-menu-item]:rounded-lg! [&_.ant-menu-item-selected]:bg-teal-500/20! [&_.ant-menu-item-selected]:text-teal-400! [&_.ant-menu-item]:text-[hsl(var(--sidebar-foreground))]/80! [&_.ant-menu-item:hover]:text-white! [&_.ant-menu-item]:h-11! [&_.ant-menu-submenu-title]:mx-2! [&_.ant-menu-submenu-title]:rounded-lg! [&_.ant-menu-submenu-selected>.ant-menu-submenu-title]:text-teal-400!"
+            style={{ background: "transparent" }}
+          />
+        </div>
+        {canScrollDown ? (
+          <div
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-[hsl(var(--sidebar-bg))] to-transparent"
+            aria-hidden
+          />
+        ) : null}
       </div>
     </aside>
   );

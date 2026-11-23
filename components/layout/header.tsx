@@ -1,13 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { Button, Dropdown, Avatar } from "antd";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { NotificationCenter } from "@/components/notifications/notification-center";
 import { ChangePasswordModal } from "@/components/auth/change-password-modal";
-import { UserOutlined, LogoutOutlined, LockOutlined } from "@ant-design/icons";
+import { UserOutlined, LogoutOutlined, LockOutlined, SettingOutlined } from "@ant-design/icons";
 import type { MenuProps } from "antd";
+import { hasPermission, PERMISSIONS } from "@/lib/auth/permissions";
 
 const ROLE_NAMES: Record<string, string> = {
   superadmin: "Superadmin",
@@ -19,10 +21,12 @@ const ROLE_NAMES: Record<string, string> = {
 };
 
 export function Header() {
+  const router = useRouter();
   const { data: session } = useSession();
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
 
   const roles = (session?.user as { roles?: string[] })?.roles ?? [];
+  const showSettings = hasPermission(roles, PERMISSIONS.ADMIN_SETTINGS);
   const roleLabel = roles.length > 0
     ? roles.map((r) => ROLE_NAMES[r] ?? r).join(", ")
     : "";
@@ -47,6 +51,16 @@ export function Header() {
       icon: <LockOutlined />,
       onClick: () => setChangePasswordOpen(true),
     },
+    ...(showSettings
+      ? [
+          {
+            key: "settings",
+            label: "Pengaturan",
+            icon: <SettingOutlined />,
+            onClick: () => router.push("/dashboard/settings"),
+          },
+        ]
+      : []),
     {
       type: "divider",
     },
