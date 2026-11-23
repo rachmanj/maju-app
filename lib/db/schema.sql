@@ -144,7 +144,7 @@ CREATE TABLE IF NOT EXISTS members (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 ALTER TABLE members ADD COLUMN department_id INT NULL;
-ALTER TABLE members ADD CONSTRAINT fk_members_department FOREIGN KEY (department_id) REFERENCES departments(id);
+ALTER TABLE members ADD CONSTRAINT members_department_id_fkey FOREIGN KEY (department_id) REFERENCES departments(id);
 
 ALTER TABLE members MODIFY COLUMN nik VARCHAR(255) NULL UNIQUE;
 ALTER TABLE members ADD COLUMN member_number VARCHAR(50) NULL UNIQUE;
